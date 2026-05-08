@@ -21,7 +21,7 @@
   "build": {
     "appId": "com.juangaldo.mushu",
     "productName": "Mushu",
-    "artifactName": "${productName}-${version}-Setup.${ext}",
+    "artifactName": "${productName}-Setup.${ext}",
     "directories": {
       "output": "release"
     },
