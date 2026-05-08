@@ -78,7 +78,7 @@ cd mushu-v2
 npm install
 ```
 
-Creá un archivo `.env` en la raíz con las variables necesarias (mirá `.env.example`):
+Creá un archivo `.env` en la raíz con las variables necesarias:
 
 ```ini
 DEEPGRAM_API_KEY=...
