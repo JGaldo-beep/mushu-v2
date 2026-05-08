@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "docs-electron": {
+      "source": "imgly/agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cesdk/skills/docs-electron/SKILL.md",
+      "computedHash": "596b46387c6a18b3991afd31534868f90800956d5fac8bc6fad1f65eeb1f17a8"
+    }
+  }
+}
