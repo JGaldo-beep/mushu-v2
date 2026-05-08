@@ -4,7 +4,7 @@ import type { FrontendState, MushuAccount } from "@/lib/types";
 
 type OnboardingSnapshot = {
   hotkey: string;
-  mode_hotkey: string;
+  ptt_hotkey: string;
   account: MushuAccount | null;
 };
 
@@ -30,7 +30,7 @@ export function useOnboarding() {
         const done = parseOnboardingDone(fs);
         setSnapshot({
           hotkey: fs.hotkey,
-          mode_hotkey: fs.mode_hotkey,
+          ptt_hotkey: fs.ptt_hotkey,
           account: fs.account,
         });
         setOpen(!done);

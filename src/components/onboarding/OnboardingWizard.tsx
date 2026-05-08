@@ -1,8 +1,9 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { ShortcutKbd } from "@/components/ShortcutKbd";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { listen } from "@/lib/events";
 import { tauri } from "@/lib/tauri";
 import type { MushuAccount, NavSection } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -17,7 +18,7 @@ type ConfettiStyle = CSSProperties & {
 
 type Props = {
   hotkey: string;
-  modeHotkey: string;
+  pttHotkey: string;
   account: MushuAccount | null;
   onComplete: () => Promise<void>;
   onNavigateSettings: (section: NavSection) => void;
@@ -26,7 +27,7 @@ type Props = {
 
 export function OnboardingWizard({
   hotkey,
-  modeHotkey,
+  pttHotkey,
   account,
   onComplete,
   onNavigateSettings,
@@ -34,15 +35,33 @@ export function OnboardingWizard({
 }: Props) {
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [email, setEmail] = useState(account?.user.email || "antonio@30x.com");
+  const [email, setEmail] = useState(account?.user.email || "");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [confettiSeed, setConfettiSeed] = useState(0);
   const [signedInEmail, setSignedInEmail] = useState(account?.user.email || null);
+  const [testText, setTestText] = useState<string>("");
 
   const dictationParts = hotkey.split("+");
-  const modeParts = modeHotkey.split("+");
+  const pttParts = pttHotkey.split("+");
+
+  useEffect(() => {
+    let mounted = true;
+    let off: (() => void) | null = null;
+    void listen<{ text?: string }>("transcription_done", (event) => {
+      if (!mounted) return;
+      const text = String(event.payload?.text || "").trim();
+      if (text) setTestText(text);
+    }).then((u) => {
+      if (!mounted) u();
+      else off = u;
+    });
+    return () => {
+      mounted = false;
+      if (off) off();
+    };
+  }, []);
 
   const finish = async () => {
     setBusy(true);
@@ -51,11 +70,6 @@ export function OnboardingWizard({
     } finally {
       setBusy(false);
     }
-  };
-
-  const goSettingsAndFinish = async () => {
-    await finish();
-    onNavigateSettings("settings");
   };
 
   const handleLogin = async () => {
@@ -120,16 +134,21 @@ export function OnboardingWizard({
           {step === 1 && (
             <div className="space-y-4">
               <p className="text-foreground/90">
-                Mantén pulsado el atajo de dictado, habla y suéltalo para procesar. Cambia de modo con el segundo
-                atajo (sin abrir la app).
+                Tenés dos formas de grabar. Probá la que te resulte más cómoda.
               </p>
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
                 <p className="text-xs font-medium text-foreground">Dictado</p>
                 <ShortcutKbd keys={dictationParts} />
+                <p className="text-xs text-muted-foreground">
+                  Tap rápido para arrancar a grabar; otro tap o ESC para enviar lo dictado.
+                </p>
               </div>
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
-                <p className="text-xs font-medium text-foreground">Cambiar modo</p>
-                <ShortcutKbd keys={modeParts} />
+                <p className="text-xs font-medium text-foreground">Push-to-talk</p>
+                <ShortcutKbd keys={pttParts} />
+                <p className="text-xs text-muted-foreground">
+                  Mantenelo pulsado mientras hablás; al soltar se envía.
+                </p>
               </div>
               <p className="text-xs">Puedes cambiarlos en Ajustes → Atajos de teclado.</p>
             </div>
@@ -137,46 +156,20 @@ export function OnboardingWizard({
 
           {step === 2 && (
             <div className="space-y-3 text-foreground/90">
-              <p>
-                La primera vez que grabes, Windows puede pedir permiso para usar el <strong className="text-foreground">micrófono</strong>.
-                Acepta la petición para que Mushu escuche el audio.
-              </p>
-              <p className="text-xs">
-                Elige el micrófono correcto en Ajustes si tienes varios dispositivos.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                disabled={busy}
-                onClick={() => void goSettingsAndFinish()}
-              >
-                Abrir Ajustes y terminar tour
-              </Button>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-3 text-foreground/90">
               {signedInEmail ? (
                 <div className="space-y-3">
                   <p>
-                    Trial activado para <strong className="text-foreground">{signedInEmail}</strong>.
+                    Ya iniciaste sesión como <strong className="text-foreground">{signedInEmail}</strong>.
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Puedes revisar tus minutos restantes en Cuenta.
+                    La primera vez que grabes, Windows puede pedir permiso para usar el micrófono. Aceptá para continuar.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <p>
-                    Inicia sesión para activar tu <strong className="text-foreground">trial de Mushu</strong>. No necesitas configurar Groq ni Deepgram en este equipo.
+                    Iniciá sesión para activar tu <strong className="text-foreground">trial de Mushu</strong>. No necesitás configurar nada más.
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    En beta usamos Supabase para sesión y el backend de Mushu para medir tus minutos.
-                  </p>
-
                   <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
                     <div className="space-y-2">
                       <Input
@@ -214,31 +207,68 @@ export function OnboardingWizard({
                       </p>
                     ) : null}
                   </div>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-1"
-                    disabled={busy || authBusy}
-                    onClick={() => {
-                      void finish();
-                      onNavigateSettings("account");
-                    }}
-                  >
-                    Abrir Cuenta y terminar tour
-                  </Button>
                 </div>
               )}
             </div>
           )}
 
+          {step === 3 && (
+            <div className="space-y-4">
+              <p className="text-foreground/90">
+                Probemos que todo funciona. Mantené el atajo y decí algo:
+              </p>
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-medium text-foreground">Push-to-talk</p>
+                  <ShortcutKbd keys={pttParts} size="sm" />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Sugerencia: decí <strong className="text-foreground">"Hola, ¿cómo estás?"</strong>
+                </p>
+              </div>
+              <div className="min-h-20 rounded-lg border border-border bg-muted/30 p-3">
+                <p className="mb-2 text-xs font-medium text-foreground">Resultado</p>
+                {testText ? (
+                  <p className="text-sm text-foreground/90">
+                    <span className="text-emerald-500">✓</span> &ldquo;{testText}&rdquo;
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Esperando tu primer dictado…</p>
+                )}
+              </div>
+              {testText ? (
+                <p className="text-xs text-emerald-500">¡Funciona! Continuá cuando quieras.</p>
+              ) : null}
+            </div>
+          )}
+
           {step === 4 && (
             <div className="space-y-3 text-foreground/90">
-              <p>Ya puedes probar: mantén el atajo de dictado, habla y suelta.</p>
-              <p className="text-xs text-muted-foreground">
-                Ajustes finos (tema, sonidos, micrófono y cuenta) están en la barra lateral.
-              </p>
+              {signedInEmail ? (
+                <>
+                  <p>
+                    Trial activado para <strong className="text-foreground">{signedInEmail}</strong>.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Podés revisar tus minutos restantes en la sección Cuenta.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    disabled={busy}
+                    onClick={() => {
+                      void finish();
+                      onNavigateSettings("account");
+                    }}
+                  >
+                    Ir a Cuenta
+                  </Button>
+                </>
+              ) : (
+                <p>Iniciá sesión cuando quieras desde la barra lateral para activar tu trial.</p>
+              )}
             </div>
           )}
         </div>

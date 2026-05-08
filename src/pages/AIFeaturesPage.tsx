@@ -4,10 +4,8 @@ import type { ReactNode } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import { GlassSelect } from "@/components/GlassSelect";
 import { GlassToggle } from "@/components/GlassToggle";
-import { ShortcutKbd } from "@/components/ShortcutKbd";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAIFeatures } from "@/hooks/useAIFeatures";
-import { useDictation } from "@/hooks/useDictation";
 
 const LANGUAGES = [
   { value: "en", label: "Inglés" },
@@ -16,14 +14,19 @@ const LANGUAGES = [
   { value: "de", label: "Alemán" },
   { value: "pt", label: "Portugués" },
   { value: "it", label: "Italiano" },
+  { value: "nl", label: "Neerlandés" },
+  { value: "pl", label: "Polaco" },
+  { value: "ru", label: "Ruso" },
+  { value: "tr", label: "Turco" },
+  { value: "ar", label: "Árabe" },
+  { value: "hi", label: "Hindi" },
   { value: "ja", label: "Japonés" },
-  { value: "zh", label: "Chino" },
+  { value: "ko", label: "Coreano" },
+  { value: "zh", label: "Chino simplificado" },
 ];
 
 export function AIFeaturesPage() {
   const ai = useAIFeatures();
-  const { modeHotkey } = useDictation();
-  const modeHotkeyParts = modeHotkey.split("+");
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -71,31 +74,12 @@ export function AIFeaturesPage() {
             onChange={(v) => ai.setField("formattingEnabled", v)}
           />
 
-          <FeatureCard
+          <InfoCard
             icon={Sparkles}
             color="#7c3aed"
-            title="Agent Mode"
-            description="Ejecuta un comando sobre el texto seleccionado: resumir, reescribir, explicar."
-            value={ai.agentEnabled}
-            onChange={(v) => ai.setField("agentEnabled", v)}
-            extra={
-              ai.agentEnabled ? (
-                <div className="flex items-center gap-2 pt-3">
-                  <span
-                    style={{
-                      fontFamily: "'Space Mono', monospace",
-                      fontSize: "10px",
-                      color: "var(--text-muted)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                    }}
-                  >
-                    Atajo
-                  </span>
-                  <ShortcutKbd keys={modeHotkeyParts} size="sm" />
-                </div>
-              ) : null
-            }
+            title="Modo agente"
+            description="Si seleccionás texto antes de dictar, Mushu usa lo que digas como instrucción y reemplaza la selección con el resultado. Sin atajo extra ni configuración."
+            example='Ejemplo: seleccionás "Hi, how are you?" → mantenés el atajo + decís "traducí al español" → te reemplaza con "Hola, ¿cómo estás?".'
           />
 
           <FeatureCard
@@ -142,7 +126,7 @@ export function AIFeaturesPage() {
             lineHeight: 1.5,
           }}
         >
-          Estas funciones se aplican después de la transcripción y se procesan desde el backend de Mushu para proteger las claves de IA.
+          Estas funciones se aplican después de transcribir tu voz. Las podés activar y desactivar en cualquier momento.
         </p>
       </div>
     </div>
@@ -157,6 +141,78 @@ interface FeatureCardProps {
   value: boolean;
   onChange: (v: boolean) => void;
   extra?: ReactNode;
+}
+
+interface InfoCardProps {
+  icon: LucideIcon;
+  color: string;
+  title: string;
+  description: string;
+  example?: string;
+}
+
+function InfoCard({ icon: Icon, color, title, description, example }: InfoCardProps) {
+  return (
+    <GlassCard className="p-5">
+      <div className="flex items-start gap-4">
+        <div
+          style={{
+            width: "44px",
+            height: "44px",
+            borderRadius: "12px",
+            background: `${color}14`,
+            border: `0.5px solid ${color}30`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Icon size={20} strokeWidth={2} style={{ color }} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3
+            style={{
+              fontFamily: "'Geist Variable', sans-serif",
+              fontSize: "14px",
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.005em",
+              marginBottom: "3px",
+            }}
+          >
+            {title}
+          </h3>
+          <p
+            style={{
+              fontFamily: "'Geist Variable', sans-serif",
+              fontSize: "12.5px",
+              fontWeight: 450,
+              color: "var(--text-secondary)",
+              lineHeight: 1.5,
+            }}
+          >
+            {description}
+          </p>
+          {example ? (
+            <p
+              className="mt-2"
+              style={{
+                fontFamily: "'Geist Variable', sans-serif",
+                fontSize: "11.5px",
+                fontWeight: 450,
+                color: "var(--text-muted)",
+                lineHeight: 1.5,
+                fontStyle: "italic",
+              }}
+            >
+              {example}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </GlassCard>
+  );
 }
 
 function FeatureCard({ icon: Icon, color, title, description, value, onChange, extra }: FeatureCardProps) {

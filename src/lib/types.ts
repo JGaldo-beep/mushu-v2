@@ -18,6 +18,7 @@ export type TranscriptionProvider = "groq" | "deepgram";
 export type FrontendState = {
   mode: ModeInfo;
   hotkey: string;
+  ptt_hotkey: string;
   mode_hotkey: string;
   cycle_mode_hotkey: string;
   pause_hotkey: string;
@@ -35,6 +36,9 @@ export type FrontendState = {
   sound_effects_enabled: boolean;
   sound_effects_volume: number;
   onboarding_completed: boolean;
+  ai_formatting_enabled: boolean;
+  auto_translate_enabled: boolean;
+  auto_translate_target: string;
   account: MushuAccount | null;
 };
 
@@ -61,6 +65,7 @@ export type MushuAccount = {
 
 export type SaveSettingsInput = {
   hotkey: string;
+  ptt_hotkey?: string;
   mode_hotkey: string;
   cycle_mode_hotkey?: string;
   pause_hotkey: string;
@@ -74,6 +79,9 @@ export type SaveSettingsInput = {
   theme: ThemePref;
   sound_effects_enabled: boolean;
   sound_effects_volume: number;
+  ai_formatting_enabled?: boolean;
+  auto_translate_enabled?: boolean;
+  auto_translate_target?: string;
 };
 
 export type HistoryItem = {

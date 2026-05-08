@@ -326,8 +326,8 @@ export function SettingsPage() {
               description="Speech-to-text administrado por el backend de Mushu"
             />
             <SettingRow
-              label="Backend"
-              description="La app envía audio autenticado a /api/mushu/transcribe. Deepgram y Groq quedan protegidos en Vercel."
+              label="Servicio"
+              description="Mushu transcribe tu voz de forma segura usando nuestros servidores. Tus credenciales nunca salen de tu cuenta."
               isLast
               control={
                 <span
@@ -361,7 +361,7 @@ export function SettingsPage() {
                   color: "var(--text-secondary)",
                 }}
               >
-              Para la beta, la transcripción final ocurre al soltar el atajo. El preview en vivo volverá cuando agreguemos proxy WebSocket en el backend.
+              Puedes ver lo que hablas en vivo en la cápsula del overlay mientras dictas.
             </div>
           </GlassCard>
 
@@ -395,15 +395,15 @@ export function SettingsPage() {
               }
             />
             <SettingRow
-              label="Agent Mode"
-              description="Atajo para ejecutar comandos sobre texto seleccionado."
-              htmlFor="mode_hotkey"
+              label="Push-to-talk"
+              description="Mantén pulsado mientras hablás; al soltar se envía el texto. Sin ambigüedad de tap."
+              htmlFor="ptt_hotkey"
               control={
                 <input
-                  id="mode_hotkey"
-                  value={draft?.mode_hotkey ?? ""}
-                  onChange={(e) => setField("mode_hotkey", e.target.value)}
-                  placeholder="Ctrl+Shift+M"
+                  id="ptt_hotkey"
+                  value={draft?.ptt_hotkey ?? ""}
+                  onChange={(e) => setField("ptt_hotkey", e.target.value)}
+                  placeholder="Ctrl+Shift+Space"
                   className="glass-input rounded-lg"
                   style={{
                     fontFamily: "'Space Mono', monospace",

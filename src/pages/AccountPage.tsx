@@ -42,7 +42,7 @@ function initialsFromAccount(account: MushuAccount | null): string {
 
 export function AccountPage() {
   const { state, loading, refresh } = useSettings();
-  const [email, setEmail] = useState("antonio@30x.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const account = state?.account ?? null;

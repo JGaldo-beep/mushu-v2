@@ -27,7 +27,6 @@ export default defineConfig(async () => ({
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
         overlay: fileURLToPath(new URL("./overlay.html", import.meta.url)),
         explain: fileURLToPath(new URL("./explain.html", import.meta.url)),
-        agent: fileURLToPath(new URL("./agent.html", import.meta.url)),
       },
     },
   },

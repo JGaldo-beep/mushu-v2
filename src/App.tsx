@@ -40,7 +40,7 @@ function App() {
       {!onboarding.loading && onboarding.open && onboarding.snapshot && (
         <OnboardingWizard
           hotkey={onboarding.snapshot.hotkey}
-          modeHotkey={onboarding.snapshot.mode_hotkey}
+          pttHotkey={onboarding.snapshot.ptt_hotkey}
           account={onboarding.snapshot.account}
           onComplete={onboarding.complete}
           onNavigateSettings={setSection}

@@ -59,6 +59,7 @@ export function useSettings() {
       const fresh = await tauri.getFrontendState();
       const input: SaveSettingsInput = {
         hotkey: draft.hotkey,
+        ptt_hotkey: draft.ptt_hotkey,
         mode_hotkey: draft.mode_hotkey,
         pause_hotkey: draft.pause_hotkey,
         api_base_url: draft.api_base_url,

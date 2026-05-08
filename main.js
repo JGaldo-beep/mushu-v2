@@ -39,6 +39,7 @@ const MODE_ORDER = ["DEFAULT", "EMAIL", "NOTE"];
 const HANDS_OFF_TAP_THRESHOLD_MS = 250;
 const DEFAULT_SETTINGS = {
   hotkey: "Ctrl+Space",
+  ptt_hotkey: "Ctrl+Shift+Space",
   mode_hotkey: "Ctrl+Shift+M",
   cycle_mode_hotkey: "Ctrl+Shift+,",
   pause_hotkey: "Ctrl+Shift+P",
@@ -53,14 +54,17 @@ const DEFAULT_SETTINGS = {
   sound_effects_enabled: true,
   sound_effects_volume: 0.22,
   onboarding_completed: false,
+  ai_formatting_enabled: true,
+  auto_translate_enabled: false,
+  auto_translate_target: "en",
 };
 
 let mainWindow = null;
 let overlayWindow = null;
 let explainWindow = null;
-let agentWindow = null;
 let agentTargetHandle = null;
-let agentBusy = false;
+let agentSelection = null;
+let agentCapturePromise = null;
 let tray = null;
 let settings = { ...DEFAULT_SETTINGS };
 let secrets = {};
@@ -77,6 +81,7 @@ let updateTrayMenu = null;
 let modeBannerTimer = null;
 let primaryHotkeyDown = false;
 let primaryHotkeyStartedAt = 0;
+let pttHotkeyDown = false;
 let uiohookStarted = false;
 let deepgramSocket = null;
 let deepgramSocketReady = false;
@@ -612,56 +617,6 @@ function positionOverlay() {
   overlayWindow.setBounds({ x, y, width, height }, false);
 }
 
-function positionAgentWindow() {
-  if (!agentWindow) return;
-  const cursor = screen.getCursorScreenPoint();
-  const display = screen.getDisplayNearestPoint(cursor);
-  const width = 600;
-  const height = 420;
-  const x = Math.round(display.workArea.x + (display.workArea.width - width) / 2);
-  const y = Math.round(display.workArea.y + display.workArea.height - height - 110);
-  agentWindow.setBounds({ x, y, width, height }, false);
-}
-
-async function openAgentFromSelection() {
-  if (!agentWindow || agentWindow.isDestroyed()) return;
-  if (agentBusy) return;
-  if (agentWindow.isVisible()) {
-    agentWindow.focus();
-    return;
-  }
-  agentBusy = true;
-  let selection = "";
-  let error = null;
-
-  try {
-    if (!accountCache) {
-      error = "Inicia sesión en Mushu para usar el agente.";
-    } else {
-      agentTargetHandle = await getForegroundWindowHandle();
-      try {
-        selection = await captureSelectedTextFromActiveApp();
-      } catch (err) {
-        error = err instanceof Error ? err.message : String(err);
-      }
-      if (!selection && !error) {
-        error = "No se detectó texto seleccionado. Selecciona algo y vuelve a intentarlo.";
-      }
-    }
-  } finally {
-    agentBusy = false;
-  }
-
-  positionAgentWindow();
-  agentWindow.show();
-  agentWindow.focus();
-  // Renderer is already mounted (window is created at app start), so a tiny
-  // delay is enough to ensure the listener is wired before we broadcast.
-  setTimeout(() => {
-    broadcast("agent_selection", { text: selection, error });
-  }, 80);
-}
-
 function setupTray() {
   const iconPath = path.join(__dirname, "public", "mushu-icon.png");
   if (!fsSync.existsSync(iconPath)) return;
@@ -773,6 +728,17 @@ async function transformText(rawText) {
   return String(data?.output || "").trim() || text;
 }
 
+async function translateText(rawText, targetLanguage) {
+  const text = String(rawText || "").trim();
+  if (!text) return "";
+  const target = String(targetLanguage || "en").trim() || "en";
+  const data = await callMushuJson("/api/mushu/translate", {
+    text,
+    target_language: target,
+  });
+  return String(data?.output || "").trim() || text;
+}
+
 function groqErrorMessage(prefix, error) {
   const raw = error instanceof Error ? error.message : String(error);
   return `${prefix}: ${raw.replace(/^Error:\s*/i, "")}`;
@@ -834,10 +800,19 @@ function resetDeepgramStreamState() {
 }
 
 function startDeepgramStream() {
+  const previousSocket = deepgramSocket;
+  if (previousSocket) {
+    try {
+      if (previousSocket.readyState === WebSocket.OPEN) {
+        previousSocket.send(JSON.stringify({ type: "close" }));
+      }
+      previousSocket.close();
+    } catch {}
+  }
+  deepgramSocket = null;
+  deepgramSocketReady = false;
   resetDeepgramStreamState();
   if (settings.transcription_provider !== "deepgram") {
-    deepgramSocket = null;
-    deepgramSocketReady = false;
     return;
   }
 
@@ -871,6 +846,9 @@ function startDeepgramStream() {
       });
 
       socket.on("message", (raw) => {
+        // Si ya no somos el socket activo (timeout vencido y nueva grabacion empezo),
+        // ignoramos cualquier mensaje tardio para no contaminar el estado nuevo.
+        if (deepgramSocket !== socket) return;
         try {
           const data = JSON.parse(String(raw));
           if (data.type === "ready") {
@@ -932,12 +910,16 @@ function startDeepgramStream() {
 }
 
 async function finishDeepgramStream() {
+  const finishStartedAt = Date.now();
   const socket = deepgramSocket;
   if (!socket) return deepgramFinalTranscript.trim();
 
   const done = deepgramStreamDone;
+  // Hibrido: esperamos como mucho 400ms al final de Deepgram. Si no llega a tiempo,
+  // caemos al interim (ya bastante bueno por el streaming previo). Mejor latencia
+  // sin sacrificar mucha calidad porque el interim ya estaba refinandose en vivo.
   await new Promise((resolve) => {
-    const timer = setTimeout(resolve, 1600);
+    const timer = setTimeout(resolve, 400);
     Promise.resolve(done).then(() => {
       clearTimeout(timer);
       resolve();
@@ -954,9 +936,16 @@ async function finishDeepgramStream() {
     }
   });
 
-  deepgramSocket = null;
-  deepgramSocketReady = false;
-  return (deepgramFinalTranscript || deepgramInterimTranscript).trim();
+  if (deepgramSocket === socket) {
+    deepgramSocket = null;
+    deepgramSocketReady = false;
+  }
+  const result = (deepgramFinalTranscript || deepgramInterimTranscript).trim();
+  const finishMs = Date.now() - finishStartedAt;
+  console.info(
+    `[stt:stream] finish took ${finishMs}ms — returns ${result.length} chars (final=${deepgramFinalTranscript.length} interim=${deepgramInterimTranscript.length})`,
+  );
+  return result;
 }
 
 async function transcribeAudio(audioChunks, mimeType) {
@@ -1029,15 +1018,89 @@ async function processRecording() {
       broadcast("transcription_done", { text: "", mode: currentMode });
       return;
     }
+
+    // Esperar la captura de seleccion (corre en paralelo con la grabacion).
+    if (agentCapturePromise) {
+      await agentCapturePromise.catch(() => {});
+      agentCapturePromise = null;
+    }
+
+    if (agentSelection && accountCache) {
+      const selectedText = agentSelection;
+      const targetHandle = agentTargetHandle;
+      agentSelection = null;
+      agentTargetHandle = null;
+
+      let output = "";
+      try {
+        const data = await callMushuJson("/api/mushu/agent", {
+          selectedText,
+          instruction: rawText,
+          mode: "agent",
+        });
+        output = String(data?.output || "").trim();
+        if (!output) throw new Error("Respuesta vacia del agente.");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("[agent] failed:", message);
+        broadcast("groq_error", message);
+        broadcast("transcription_error", message);
+        return;
+      }
+
+      const beforePaste = clipboard.readText();
+      clipboard.writeText(output);
+      await sleep(80);
+      try {
+        if (targetHandle) await focusWindowAndPaste(targetHandle);
+        else await pasteClipboardToActiveApp();
+      } catch (pasteError) {
+        console.error(
+          "[agent:paste] failed:",
+          pasteError instanceof Error ? pasteError.message : String(pasteError),
+        );
+      }
+      await sleep(180);
+      if (beforePaste) clipboard.writeText(beforePaste);
+
+      historyStore.unshift({
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        raw_text: rawText,
+        processed_text: output,
+        mode_used: "AGENT",
+        duration_ms: Date.now() - recordingStartedAt,
+      });
+      historyStore = historyStore.slice(0, 200);
+      await persistState();
+      broadcast("transcription_done", { text: output, mode: currentMode });
+      await refreshAccountFromBackend().catch(() => {});
+      broadcast("frontend_state_changed", {});
+      return;
+    }
+
     let transformed = rawText;
-    try {
-      transformed = await transformText(rawText);
-    } catch (error) {
-      const message = groqErrorMessage("Transformación Groq", error);
-      console.error(message);
-      broadcast("groq_error", message);
-      // Si ya hay transcripción, no bloqueamos el flujo: pegamos el texto crudo.
-      transformed = rawText;
+    if (settings.auto_translate_enabled) {
+      // La traduccion produce texto ya limpio y bien puntuado, asi que
+      // sustituye al paso de AI Formatting cuando ambos estan activos.
+      try {
+        transformed = await translateText(rawText, settings.auto_translate_target);
+      } catch (error) {
+        const message = groqErrorMessage("Traducción Groq", error);
+        console.error(message);
+        broadcast("groq_error", message);
+        transformed = rawText;
+      }
+    } else if (settings.ai_formatting_enabled) {
+      try {
+        transformed = await transformText(rawText);
+      } catch (error) {
+        const message = groqErrorMessage("Transformación Groq", error);
+        console.error(message);
+        broadcast("groq_error", message);
+        // Si ya hay transcripción, no bloqueamos el flujo: pegamos el texto crudo.
+        transformed = rawText;
+      }
     }
     clipboard.writeText(transformed);
     await sleep(80);
@@ -1084,6 +1147,21 @@ function startRecording({ handsOffMode = false } = {}) {
   overlayWindow?.showInactive();
   capturedChunks = [];
   recordingStartedAt = Date.now();
+  agentSelection = null;
+  agentTargetHandle = null;
+  // Captura la seleccion actual (si la hay) en paralelo con la grabacion.
+  // Si processRecording encuentra seleccion, entra en modo agente; si no, dictado normal.
+  agentCapturePromise = (async () => {
+    try {
+      const handle = await getForegroundWindowHandle();
+      const sel = await captureSelectedTextFromActiveApp();
+      const trimmed = (sel || "").trim();
+      if (trimmed) {
+        agentSelection = trimmed;
+        agentTargetHandle = handle;
+      }
+    } catch {}
+  })();
   broadcast("recording_started", currentMode);
   broadcast("hands_off_changed", handsOff);
   broadcast("dictation_paused", false);
@@ -1097,6 +1175,7 @@ function stopRecording({ cancel = false } = {}) {
   paused = false;
   handsOff = false;
   primaryHotkeyDown = false;
+  pttHotkeyDown = false;
   stopAudioLevelEvents();
 
   if (cancel) {
@@ -1138,10 +1217,10 @@ function togglePause() {
 function setHotkeys() {
   globalShortcut.unregisterAll();
   const hotkey = normalizeAccelerator(settings.hotkey);
-  const agentHotkey = normalizeAccelerator(settings.mode_hotkey);
   const cycleModeHotkey = normalizeAccelerator(settings.cycle_mode_hotkey);
   const pauseHotkey = normalizeAccelerator(settings.pause_hotkey);
   const primaryShortcut = parseShortcutForHook(settings.hotkey);
+  const pttShortcut = parseShortcutForHook(settings.ptt_hotkey);
 
   if (
     hotkey &&
@@ -1153,14 +1232,6 @@ function setHotkeys() {
     })
   ) {
     console.error(`No se pudo registrar hotkey principal: ${hotkey}`);
-  }
-  if (
-    agentHotkey &&
-    !globalShortcut.register(agentHotkey, () => {
-      void openAgentFromSelection();
-    })
-  ) {
-    console.error(`No se pudo registrar hotkey de agente: ${agentHotkey}`);
   }
   if (cycleModeHotkey && !globalShortcut.register(cycleModeHotkey, cycleMode)) {
     console.error(`No se pudo registrar hotkey de modo: ${cycleModeHotkey}`);
@@ -1179,6 +1250,13 @@ function setHotkeys() {
     uIOhook.removeAllListeners("keyup");
     uIOhook.on("keydown", (evt) => {
       const key = Number(evt.keycode);
+      // PTT puro: mantener para grabar, soltar para enviar (sin entrar a hands-off).
+      if (pttShortcut && matchesShortcut(evt, pttShortcut)) {
+        if (pttHotkeyDown) return;
+        pttHotkeyDown = true;
+        if (!recording) startRecording({ handsOffMode: false });
+        return;
+      }
       if (matchesShortcut(evt, primaryShortcut) && !globalShortcut.isRegistered(hotkey)) {
         if (primaryHotkeyDown) return;
         primaryHotkeyDown = true;
@@ -1191,6 +1269,11 @@ function setHotkeys() {
       }
     });
     uIOhook.on("keyup", (evt) => {
+      if (pttShortcut && matchesShortcut(evt, pttShortcut)) {
+        pttHotkeyDown = false;
+        if (recording) stopRecording();
+        return;
+      }
       if (!matchesShortcut(evt, primaryShortcut)) return;
       const heldForMs = Date.now() - primaryHotkeyStartedAt;
       primaryHotkeyDown = false;
@@ -1295,83 +1378,6 @@ function registerIpc(updateTrayMenu) {
       case "close_explain_window":
         explainWindow?.hide();
         return;
-      case "agent_open_from_selection":
-        await openAgentFromSelection();
-        return { ok: true };
-      case "agent_cancel":
-        if (agentWindow && !agentWindow.isDestroyed()) agentWindow.hide();
-        agentTargetHandle = null;
-        broadcast("agent_processing", { active: false });
-        return { ok: true };
-      case "close_agent_window":
-        if (agentWindow && !agentWindow.isDestroyed()) agentWindow.hide();
-        agentTargetHandle = null;
-        return;
-      case "agent_submit": {
-        const selectedText = String(args.selectedText || "").trim();
-        const instruction = String(args.instruction || "").trim();
-        const allowedModes = new Set(["agent", "email", "translate", "summarize"]);
-        const mode = allowedModes.has(String(args.mode)) ? String(args.mode) : "agent";
-        if (!selectedText) {
-          broadcast("agent_error", { message: "No hay texto seleccionado." });
-          return { ok: false, message: "no_selection" };
-        }
-        if (!instruction) {
-          broadcast("agent_error", { message: "Falta la instrucción." });
-          return { ok: false, message: "no_instruction" };
-        }
-        if (!accountCache) {
-          broadcast("agent_error", { message: "Inicia sesión en Mushu para usar el agente." });
-          return { ok: false, message: "no_session" };
-        }
-
-        broadcast("agent_processing", { active: true });
-        try {
-          const data = await callMushuJson("/api/mushu/agent", {
-            selectedText,
-            instruction,
-            mode,
-          });
-          const output = String(data?.output || "").trim();
-          if (!output) throw new Error("Respuesta vacía del agente.");
-
-          const beforePaste = clipboard.readText();
-          clipboard.writeText(output);
-
-          const targetHandle = agentTargetHandle;
-          agentTargetHandle = null;
-          if (agentWindow && !agentWindow.isDestroyed()) agentWindow.hide();
-          await sleep(90);
-
-          try {
-            if (targetHandle) {
-              await focusWindowAndPaste(targetHandle);
-            } else {
-              await pasteClipboardToActiveApp();
-            }
-          } catch (pasteError) {
-            console.error(
-              "[agent:paste] failed:",
-              pasteError instanceof Error ? pasteError.message : String(pasteError),
-            );
-          }
-
-          await sleep(180);
-          if (beforePaste) clipboard.writeText(beforePaste);
-
-          broadcast("agent_done", { output });
-          await refreshAccountFromBackend().catch(() => {});
-          broadcast("frontend_state_changed", {});
-          return { ok: true };
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          console.error("[agent] failed:", message);
-          broadcast("agent_error", { message });
-          return { ok: false, message };
-        } finally {
-          broadcast("agent_processing", { active: false });
-        }
-      }
       case "explain_stream":
         explainAbort?.abort?.();
         explainAbort = new AbortController();
@@ -1500,25 +1506,12 @@ app.whenReady().then(async () => {
     alwaysOnTop: true,
     skipTaskbar: true,
   });
-  agentWindow = createWindow("agent.html", {
-    width: 600,
-    height: 420,
-    minWidth: 480,
-    minHeight: 320,
-    transparent: true,
-    frame: false,
-    resizable: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-  });
-
   updateTrayMenu = setupTray();
   registerIpc(updateTrayMenu);
   setHotkeys();
   positionOverlay();
   overlayWindow.hide();
   explainWindow.hide();
-  agentWindow.hide();
   if (pendingDeepLinkUrl) {
     await handleMushuDeepLink(pendingDeepLinkUrl);
     pendingDeepLinkUrl = null;

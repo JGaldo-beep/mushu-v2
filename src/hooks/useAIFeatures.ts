@@ -1,52 +1,80 @@
 import { useCallback, useEffect, useState } from "react";
-
-const STORAGE_KEY = "mushu.ai_features.v1";
+import { listen } from "@/lib/events";
+import { tauri } from "@/lib/tauri";
 
 export interface AIFeaturesState {
   formattingEnabled: boolean;
-  agentEnabled: boolean;
   autoTranslateEnabled: boolean;
   autoTranslateTarget: string;
 }
 
 const DEFAULT_STATE: AIFeaturesState = {
   formattingEnabled: true,
-  agentEnabled: false,
   autoTranslateEnabled: false,
   autoTranslateTarget: "en",
 };
 
-function readStored(): AIFeaturesState {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_STATE;
-    const parsed = JSON.parse(raw);
-    return { ...DEFAULT_STATE, ...parsed };
-  } catch {
-    return DEFAULT_STATE;
-  }
+const SETTINGS_KEY: Record<keyof AIFeaturesState, string> = {
+  formattingEnabled: "ai_formatting_enabled",
+  autoTranslateEnabled: "auto_translate_enabled",
+  autoTranslateTarget: "auto_translate_target",
+};
+
+function fromState(s: {
+  ai_formatting_enabled?: boolean;
+  auto_translate_enabled?: boolean;
+  auto_translate_target?: string;
+}): AIFeaturesState {
+  return {
+    formattingEnabled: s.ai_formatting_enabled ?? true,
+    autoTranslateEnabled: s.auto_translate_enabled ?? false,
+    autoTranslateTarget: s.auto_translate_target ?? "en",
+  };
 }
 
-/**
- * Persists AI feature toggles in localStorage. Backend integration is intentionally
- * deferred — the values are not wired to the transcription pipeline yet.
- */
 export function useAIFeatures() {
-  const [state, setState] = useState<AIFeaturesState>(() => readStored());
+  const [state, setState] = useState<AIFeaturesState>(DEFAULT_STATE);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* ignore quota errors */
-    }
-  }, [state]);
+    let mounted = true;
+    let off: (() => void) | null = null;
+
+    const refresh = () => {
+      tauri
+        .getFrontendState()
+        .then((s) => {
+          if (mounted) setState(fromState(s));
+        })
+        .catch(() => {});
+    };
+
+    refresh();
+    void listen("frontend_state_changed", () => {
+      if (mounted) refresh();
+    }).then((u) => {
+      if (!mounted) u();
+      else off = u;
+    });
+
+    return () => {
+      mounted = false;
+      if (off) off();
+    };
+  }, []);
 
   const setField = useCallback(
     <K extends keyof AIFeaturesState>(key: K, value: AIFeaturesState[K]) => {
-      setState((s) => ({ ...s, [key]: value }));
+      setState((prev) => ({ ...prev, [key]: value }));
+      const settingsKey = SETTINGS_KEY[key];
+      // El handler save_settings hace spread, asi que un input parcial es seguro.
+      void window.mushu
+        .invoke("save_settings", { input: { [settingsKey]: value } })
+        .catch(() => {
+          // Revertimos si falla la persistencia.
+          setState((prev) => ({ ...prev, [key]: state[key] }));
+        });
     },
-    [],
+    [state],
   );
 
   return { ...state, setField };
