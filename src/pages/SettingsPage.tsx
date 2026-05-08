@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Slider } from "@/components/ui/slider";
+import { useAudioDevices } from "@/hooks/useAudioDevices";
 import { useSettings } from "@/hooks/useSettings";
 import { useSpokenLanguage } from "@/hooks/useSpokenLanguage";
 
@@ -132,6 +133,7 @@ function SettingRow({
 export function SettingsPage() {
   const { draft, loading, saving, isDirty, setField, save, reset, refresh } = useSettings();
   const { language, setLanguage } = useSpokenLanguage();
+  const { devices: audioDevices, refresh: refreshAudioDevices } = useAudioDevices();
   const ready = !loading && !!draft;
 
   const onSave = async () => {
@@ -144,16 +146,14 @@ export function SettingsPage() {
   };
 
   const onRefreshMics = async () => {
-    await refresh();
+    await Promise.all([refresh(), refreshAudioDevices()]);
     toast.success("Lista de micrófonos actualizada");
   };
 
-  const micOptions = ready
-    ? [
-        { value: "__default__", label: "Predeterminado del sistema" },
-        ...draft!.microphones.map((m) => ({ value: m, label: m })),
-      ]
-    : [{ value: "__default__", label: "Predeterminado del sistema" }];
+  const micOptions = [
+    { value: "__default__", label: "Predeterminado del sistema" },
+    ...audioDevices.map((d) => ({ value: d.deviceId, label: d.label })),
+  ];
 
   return (
     <div className="flex h-full min-h-0 flex-col">

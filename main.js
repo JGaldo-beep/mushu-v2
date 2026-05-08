@@ -126,7 +126,8 @@ function getFrontendState() {
     mode: currentMode,
     has_groq_key: Boolean(accountCache),
     has_deepgram_key: Boolean(accountCache),
-    microphones: ["Default microphone"],
+    // El renderer enumera los micros reales via navigator.mediaDevices.enumerateDevices().
+    microphones: [],
     account: accountCache,
     ...settings,
   };
