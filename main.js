@@ -2,9 +2,11 @@ import {
   app,
   BrowserWindow,
   clipboard,
+  dialog,
   globalShortcut,
   ipcMain,
   Menu,
+  powerMonitor,
   screen,
   session,
   shell,
@@ -18,6 +20,10 @@ import { execFile } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { uIOhook, UiohookKey } from "uiohook-napi";
 import WebSocket from "ws";
+// electron-updater es CommonJS: en ESM hay que importar el default y desestructurar.
+import electronUpdater from "electron-updater";
+const { autoUpdater } = electronUpdater;
+import * as rappiModule from "./src/rappi/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,12 +40,13 @@ const MODE_MAP = {
   DEFAULT: { name: "DEFAULT", label: "General", color: "#d1ff3a", icon: "Mic" },
   EMAIL: { name: "EMAIL", label: "Correo", color: "#5fb5d8", icon: "Mail" },
   NOTE: { name: "NOTE", label: "Nota", color: "#cfc0e5", icon: "StickyNote" },
+  RAPPI: { name: "RAPPI", label: "Rappi", color: "#ff6b1a", icon: "ShoppingCart" },
 };
 const MODE_ORDER = ["DEFAULT", "EMAIL", "NOTE"];
 const HANDS_OFF_TAP_THRESHOLD_MS = 250;
 const DEFAULT_SETTINGS = {
   hotkey: "Ctrl+Space",
-  ptt_hotkey: "Ctrl+Shift+Space",
+  ptt_hotkey: "F9",
   mode_hotkey: "Ctrl+Shift+M",
   cycle_mode_hotkey: "Ctrl+Shift+,",
   pause_hotkey: "Ctrl+Shift+P",
@@ -76,6 +83,7 @@ let currentMode = MODE_MAP.DEFAULT;
 let recordingStartedAt = 0;
 let audioLevelInterval = null;
 let capturedChunks = [];
+let captureDoneResolve = null;
 let explainAbort = null;
 let updateTrayMenu = null;
 let modeBannerTimer = null;
@@ -94,6 +102,64 @@ let accountCache = null;
 let pendingDeepLinkUrl = null;
 let isQuitting = false;
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTO-UPDATER
+// ─────────────────────────────────────────────────────────────────────────────
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+function setupAutoUpdater() {
+  // No verificar en desarrollo
+  if (devServerUrl) return;
+
+  autoUpdater.on("checking-for-update", () => {
+    console.log("[updater] Buscando actualizaciones...");
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    console.log("[updater] Nueva versión disponible:", info.version);
+    broadcast("update_available", { version: info.version });
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    console.log("[updater] La app está actualizada");
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    console.log(`[updater] Descargando: ${Math.round(progress.percent)}%`);
+    broadcast("update_progress", { percent: Math.round(progress.percent) });
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    console.log("[updater] Actualización descargada:", info.version);
+    broadcast("update_downloaded", { version: info.version });
+
+    // Mostrar diálogo para reiniciar
+    dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "Actualización lista",
+      message: `Mushu v${info.version} está listo para instalar.`,
+      detail: "La actualización se instalará cuando cierres la aplicación, o puedes reiniciar ahora.",
+      buttons: ["Reiniciar ahora", "Más tarde"],
+      defaultId: 0,
+    }).then((result) => {
+      if (result.response === 0) {
+        isQuitting = true;
+        autoUpdater.quitAndInstall(false, true);
+      }
+    });
+  });
+
+  autoUpdater.on("error", (error) => {
+    console.error("[updater] Error:", error.message);
+  });
+
+  // Verificar actualizaciones al iniciar
+  autoUpdater.checkForUpdates().catch((error) => {
+    console.warn("[updater] No se pudo verificar actualizaciones:", error.message);
+  });
+}
 
 function loadDotEnvFile() {
   try {
@@ -129,6 +195,7 @@ function getFrontendState() {
     // El renderer enumera los micros reales via navigator.mediaDevices.enumerateDevices().
     microphones: [],
     account: accountCache,
+    rappi_connected: rappiModule.getRappiStatus().connected,
     ...settings,
   };
 }
@@ -619,7 +686,11 @@ function positionOverlay() {
 }
 
 function setupTray() {
-  const iconPath = path.join(__dirname, "public", "mushu-icon.png");
+  // En Windows el .ico multi-resolución se renderiza nítido en el system tray;
+  // un PNG grande (500x500) a veces queda invisible.
+  const icoPath = path.join(__dirname, "build", "icon.ico");
+  const pngPath = path.join(__dirname, "public", "mushu-icon.png");
+  const iconPath = process.platform === "win32" && fsSync.existsSync(icoPath) ? icoPath : pngPath;
   if (!fsSync.existsSync(iconPath)) return;
   tray = new Tray(iconPath);
   const showMainWindow = () => {
@@ -630,12 +701,14 @@ function setupTray() {
   };
   const updateMenu = () => {
     const menu = Menu.buildFromTemplate([
-      { label: `Mode: ${currentMode.label}`, enabled: false },
+      { label: `Mushu v${app.getVersion()}`, enabled: false },
+      { label: `Modo: ${currentMode.label}`, enabled: false },
       { type: "separator" },
-      { label: "Show Mushu", click: showMainWindow },
-      { label: "Toggle Hands-off Dictation", click: () => toggleRecording() },
-      { label: "Cycle Mode", click: () => cycleMode() },
-      { label: "Quit", click: () => {
+      { label: "Abrir Mushu", click: showMainWindow },
+      { label: "Activar/Detener dictado", click: () => toggleRecording() },
+      { label: "Cambiar de modo", click: () => cycleMode() },
+      { type: "separator" },
+      { label: "Salir", click: () => {
         isQuitting = true;
         app.quit();
       } },
@@ -666,6 +739,18 @@ function parseShortcutForHook(value) {
     escape: UiohookKey.Escape,
     m: UiohookKey.M,
     p: UiohookKey.P,
+    f1: UiohookKey.F1,
+    f2: UiohookKey.F2,
+    f3: UiohookKey.F3,
+    f4: UiohookKey.F4,
+    f5: UiohookKey.F5,
+    f6: UiohookKey.F6,
+    f7: UiohookKey.F7,
+    f8: UiohookKey.F8,
+    f9: UiohookKey.F9,
+    f10: UiohookKey.F10,
+    f11: UiohookKey.F11,
+    f12: UiohookKey.F12,
   };
   return {
     ctrl: parts.includes("ctrl") || parts.includes("control") || parts.includes("cmdorctrl") || parts.includes("commandorcontrol"),
@@ -993,10 +1078,17 @@ async function transcribeAudio(audioChunks, mimeType) {
   return String(data?.transcript || "").trim();
 }
 
-async function processRecording() {
+async function processRecording(captureDone) {
   broadcast("dictation_processing", { active: true });
   try {
-    await sleep(settings.transcription_provider === "deepgram" ? 80 : 180);
+    // Esperamos a que el renderer confirme que el ultimo chunk del MediaRecorder
+    // salio. Si por algun motivo nunca llega (renderer crasheado), no bloqueamos
+    // mas de 600ms — es mejor procesar con lo que haya que colgarse.
+    if (captureDone) {
+      await Promise.race([captureDone, sleep(600)]);
+    } else {
+      await sleep(settings.transcription_provider === "deepgram" ? 80 : 180);
+    }
     const textChunks = capturedChunks
       .filter((it) => typeof it.text === "string")
       .map((it) => it.text);
@@ -1017,6 +1109,23 @@ async function processRecording() {
       }));
     if (!rawText) {
       broadcast("transcription_done", { text: "", mode: currentMode });
+      return;
+    }
+
+    // Modo Rappi: desviar al agente de voz, sin pegar al clipboard.
+    if (currentMode.name === "RAPPI") {
+      const { reply } = await rappiModule.handleVoiceInput(rawText, broadcast);
+      historyStore.unshift({
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        raw_text: rawText,
+        processed_text: reply || rawText,
+        mode_used: "RAPPI",
+        duration_ms: Date.now() - recordingStartedAt,
+      });
+      historyStore = historyStore.slice(0, 200);
+      await persistState();
+      broadcast("transcription_done", { text: rawText, mode: currentMode });
       return;
     }
 
@@ -1163,7 +1272,7 @@ function startRecording({ handsOffMode = false } = {}) {
       }
     } catch {}
   })();
-  broadcast("recording_started", currentMode);
+  broadcast("recording_started", { ...currentMode, microphone: settings.selected_microphone });
   broadcast("hands_off_changed", handsOff);
   broadcast("dictation_paused", false);
   startAudioLevelEvents();
@@ -1181,6 +1290,7 @@ function stopRecording({ cancel = false } = {}) {
 
   if (cancel) {
     capturedChunks = [];
+    captureDoneResolve = null;
     void finishDeepgramStream();
     resetDeepgramStreamState();
     broadcast("dictation_cancelled", {});
@@ -1190,10 +1300,15 @@ function stopRecording({ cancel = false } = {}) {
     return;
   }
 
+  // Armamos la promesa ANTES de avisarle al renderer para no perder la senal
+  // "done" del MediaRecorder.
+  const captureDone = new Promise((resolve) => {
+    captureDoneResolve = resolve;
+  });
   broadcast("recording_stopped", {});
   broadcast("hands_off_changed", false);
   broadcast("dictation_paused", false);
-  void processRecording().finally(() => {
+  void processRecording(captureDone).finally(() => {
     overlayWindow?.hide();
   });
 }
@@ -1218,6 +1333,7 @@ function togglePause() {
 function setHotkeys() {
   globalShortcut.unregisterAll();
   const hotkey = normalizeAccelerator(settings.hotkey);
+  const pttHotkey = normalizeAccelerator(settings.ptt_hotkey);
   const cycleModeHotkey = normalizeAccelerator(settings.cycle_mode_hotkey);
   const pauseHotkey = normalizeAccelerator(settings.pause_hotkey);
   const primaryShortcut = parseShortcutForHook(settings.hotkey);
@@ -1233,6 +1349,19 @@ function setHotkeys() {
     })
   ) {
     console.error(`No se pudo registrar hotkey principal: ${hotkey}`);
+  }
+  // Registramos el PTT con globalShortcut para "robarle" la tecla al sistema
+  // (sin esto, el atajo dispara accesos directos del SO o del navegador antes
+  //  que llegue a Mushu). uIOhook detecta el keyup para parar la grabacion al soltar.
+  if (
+    pttHotkey &&
+    !globalShortcut.register(pttHotkey, () => {
+      if (pttHotkeyDown) return;
+      pttHotkeyDown = true;
+      if (!recording) startRecording({ handsOffMode: false });
+    })
+  ) {
+    console.error(`No se pudo registrar hotkey PTT: ${pttHotkey}`);
   }
   if (cycleModeHotkey && !globalShortcut.register(cycleModeHotkey, cycleMode)) {
     console.error(`No se pudo registrar hotkey de modo: ${cycleModeHotkey}`);
@@ -1252,7 +1381,9 @@ function setHotkeys() {
     uIOhook.on("keydown", (evt) => {
       const key = Number(evt.keycode);
       // PTT puro: mantener para grabar, soltar para enviar (sin entrar a hands-off).
-      if (pttShortcut && matchesShortcut(evt, pttShortcut)) {
+      // El keydown lo maneja globalShortcut si esta registrado (para bloquear que
+      // el SO capture la tecla); si no, fallback a uIOhook.
+      if (pttShortcut && matchesShortcut(evt, pttShortcut) && !globalShortcut.isRegistered(pttHotkey)) {
         if (pttHotkeyDown) return;
         pttHotkeyDown = true;
         if (!recording) startRecording({ handsOffMode: false });
@@ -1270,10 +1401,22 @@ function setHotkeys() {
       }
     });
     uIOhook.on("keyup", (evt) => {
-      if (pttShortcut && matchesShortcut(evt, pttShortcut)) {
-        pttHotkeyDown = false;
-        if (recording) stopRecording();
-        return;
+      // PTT: paramos apenas se suelte CUALQUIERA de las teclas involucradas.
+      // matchesShortcut exigia que TODOS los modifiers siguieran presionados
+      // al hacer keyup de Space, asi que si soltabas Ctrl primero (lo natural
+      // con la mano izquierda), la grabacion quedaba colgada.
+      if (pttHotkeyDown && pttShortcut) {
+        const isPttKey = Number(evt.keycode) === pttShortcut.keycode;
+        const modifierReleased =
+          (pttShortcut.ctrl && !evt.ctrlKey) ||
+          (pttShortcut.shift && !evt.shiftKey) ||
+          (pttShortcut.alt && !evt.altKey) ||
+          (pttShortcut.meta && !evt.metaKey);
+        if (isPttKey || modifierReleased) {
+          pttHotkeyDown = false;
+          if (recording) stopRecording();
+          return;
+        }
       }
       if (!matchesShortcut(evt, primaryShortcut)) return;
       const heldForMs = Date.now() - primaryHotkeyStartedAt;
@@ -1327,8 +1470,9 @@ function registerIpc(updateTrayMenu) {
         await persistState();
         broadcast("frontend_state_changed", {});
         return getFrontendState();
-      case "save_settings":
-        settings = { ...settings, ...(args.input || {}) };
+      case "save_settings": {
+        const { microphone, ...rest } = args.input || {};
+        settings = { ...settings, ...rest, selected_microphone: microphone !== undefined ? microphone : settings.selected_microphone };
         await persistState();
         setHotkeys();
         broadcast("mushu_sound_prefs", {
@@ -1337,6 +1481,7 @@ function registerIpc(updateTrayMenu) {
         });
         broadcast("frontend_state_changed", {});
         return getFrontendState();
+      }
       case "test_groq":
         return accountCache ? "Groq listo desde el backend de Mushu." : "Inicia sesión para usar Groq desde backend.";
       case "test_deepgram":
@@ -1359,6 +1504,19 @@ function registerIpc(updateTrayMenu) {
         await shell.openExternal(url);
         return;
       }
+      case "open_microphone_settings": {
+        // Abre el panel clasico de Sonido en la pestana Recording (donde
+        // esta el toggle "Allow exclusive control"). En Windows 11/10 esto
+        // sigue siendo la unica forma de tocar esa opcion.
+        if (process.platform === "win32") {
+          execFile("control", ["mmsys.cpl,,1"], { windowsHide: false }, (err) => {
+            if (err) console.error("[mic-settings] failed:", err.message);
+          });
+        } else {
+          await shell.openExternal("x-apple.systempreferences:com.apple.preference.sound").catch(() => {});
+        }
+        return { ok: true };
+      }
       case "set_mode":
         currentMode = MODE_MAP[String(args.mode || "DEFAULT")] || MODE_MAP.DEFAULT;
         updateTrayMenu?.();
@@ -1366,6 +1524,20 @@ function registerIpc(updateTrayMenu) {
         broadcast("mode_switch_ok", currentMode);
         showOverlayBanner();
         return;
+      case "rappi_connect":
+        await rappiModule.connectRappi(broadcast);
+        broadcast("frontend_state_changed", {});
+        return getFrontendState();
+      case "rappi_disconnect":
+        await rappiModule.disconnectRappi();
+        if (currentMode.name === "RAPPI") {
+          currentMode = MODE_MAP.DEFAULT;
+          broadcast("mode_changed", currentMode);
+        }
+        broadcast("frontend_state_changed", {});
+        return getFrontendState();
+      case "rappi_get_status":
+        return rappiModule.getRappiStatus();
       case "window_minimize":
         mainWindow?.minimize();
         return;
@@ -1403,6 +1575,15 @@ function registerIpc(updateTrayMenu) {
     }
     if (typeof payload?.error === "string") {
       broadcast("transcription_error", payload.error);
+      return;
+    }
+    // El renderer avisa cuando el MediaRecorder ya emitio el ultimo chunk
+    // (despues de stop()). Asi processRecording no se adelanta y procesa
+    // un blob webm incompleto, que es lo que da "corrupt or unsupported data".
+    if (payload?.done === true) {
+      const resolve = captureDoneResolve;
+      captureDoneResolve = null;
+      resolve?.();
       return;
     }
     if (!recording || paused) return;
@@ -1471,6 +1652,14 @@ app.whenReady().then(async () => {
     callback(permission === "media" && isTrustedMediaPermission(webContents));
   });
 
+  session.fromPartition("persist:rappi").setPermissionRequestHandler(
+    (_webContents, permission, callback) => {
+      callback(["media", "geolocation", "notifications"].includes(permission));
+    },
+  );
+
+  rappiModule.initRappiMode();
+
   mainWindow = createWindow("index.html", {
     width: 1260,
     height: 780,
@@ -1519,6 +1708,28 @@ app.whenReady().then(async () => {
   }
   mainWindow.once("ready-to-show", () => mainWindow?.show());
 
+  // Configurar auto-updater después de que todo esté listo
+  setupAutoUpdater();
+
+  // Cuando la laptop sale de sleep, cualquier WebSocket de Deepgram que
+  // tuvieramos abierto suele quedar zombi (el cliente lo cree vivo pero el
+  // backend ya lo cerro). Si no reseteamos, la primera grabacion post-wake
+  // falla en silencio y cae al HTTP fallback. Tambien refrescamos la sesion
+  // de Supabase por si el token vencio mientras dormia.
+  powerMonitor.on("resume", () => {
+    console.info("[power] system resumed — resetting deepgram stream and refreshing session");
+    if (deepgramSocket) {
+      try {
+        deepgramSocket.close();
+      } catch {}
+      deepgramSocket = null;
+      deepgramSocketReady = false;
+    }
+    refreshSupabaseSession().catch((error) => {
+      console.warn("[power] session refresh after resume failed:", error instanceof Error ? error.message : String(error));
+    });
+  });
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow("index.html", {});
     mainWindow?.show();
@@ -1526,7 +1737,8 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  // Mushu vive en el tray: solo salimos si el usuario eligió "Salir" desde ahí.
+  if (isQuitting && process.platform !== "darwin") app.quit();
 });
 
 app.on("will-quit", () => {

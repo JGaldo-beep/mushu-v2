@@ -42,9 +42,9 @@ function App() {
           hotkey={onboarding.snapshot.hotkey}
           pttHotkey={onboarding.snapshot.ptt_hotkey}
           account={onboarding.snapshot.account}
+          apiBaseUrl={onboarding.snapshot.api_base_url}
           onComplete={onboarding.complete}
           onNavigateSettings={setSection}
-          onAuthChanged={onboarding.refresh}
         />
       )}
     </TooltipProvider>

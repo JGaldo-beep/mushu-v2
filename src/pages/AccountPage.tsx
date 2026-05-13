@@ -1,9 +1,7 @@
-import { CreditCard, ExternalLink, LogIn, LogOut, RefreshCw, Sparkles, User } from "lucide-react";
+import { CreditCard, ExternalLink, LogOut, RefreshCw, Sparkles, User } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/GlassCard";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useSettings } from "@/hooks/useSettings";
 import { tauri } from "@/lib/tauri";
@@ -42,32 +40,12 @@ function initialsFromAccount(account: MushuAccount | null): string {
 
 export function AccountPage() {
   const { state, loading, refresh } = useSettings();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const account = state?.account ?? null;
   const minutes = remainingMinutes(account?.entitlement ?? null);
   const minuteBarMax = Math.max(minutes ?? 0, account?.entitlement?.status === "trial" ? 120 : 60);
   const minutePercent = minutes === null ? 0 : minuteBarMax > 0 ? Math.min(100, Math.round((minutes / minuteBarMax) * 100)) : 0;
   const webBaseUrl = (state?.api_base_url || "https://juangaldo.com").replace(/\/$/, "");
-
-  const login = async () => {
-    if (!email.trim() || !password) {
-      toast.error("Escribe correo y contraseña");
-      return;
-    }
-    setBusy(true);
-    try {
-      await tauri.login(email, password);
-      setPassword("");
-      await refresh();
-      toast.success("Sesión iniciada");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const logout = async () => {
     setBusy(true);
@@ -238,7 +216,7 @@ export function AccountPage() {
           {!account ? (
             <GlassCard className="p-5">
               <div className="mb-4 flex items-start gap-3">
-                <LogIn size={18} strokeWidth={2} style={{ color: "#d1ff3a" }} />
+                <ExternalLink size={18} strokeWidth={2} style={{ color: "#d1ff3a" }} />
                 <div>
                   <h3
                     style={{
@@ -248,7 +226,7 @@ export function AccountPage() {
                       color: "var(--text-primary)",
                     }}
                   >
-                    Entrar al beta
+                    Conectar cuenta
                   </h3>
                   <p
                     style={{
@@ -260,50 +238,25 @@ export function AccountPage() {
                       marginTop: "4px",
                     }}
                   >
-                    Entra con correo y contrasena o crea tu cuenta desde la web.
+                    Inicia sesion en la web y tu cuenta se sincronizara automaticamente con la app.
                   </p>
                 </div>
               </div>
-              <div className="space-y-3">
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="correo@dominio.com"
-                  autoComplete="email"
-                  disabled={busy || loading}
-                />
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Contraseña"
-                  autoComplete="current-password"
-                  disabled={busy || loading}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void login();
-                  }}
-                />
-                <Button className="w-full gap-2" disabled={busy || loading} onClick={() => void login()}>
-                  <LogIn size={15} strokeWidth={2} />
-                  {busy ? "Entrando..." : "Iniciar sesión"}
-                </Button>
-                <button
-                  type="button"
-                  className="glass-btn flex w-full items-center justify-center gap-2 rounded-lg py-2.5"
-                  onClick={() => void openWebLogin()}
-                  disabled={busy || loading}
-                  style={{
-                    fontFamily: "'Geist Variable', sans-serif",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    opacity: busy || loading ? 0.55 : 1,
-                  }}
-                >
-                  <ExternalLink size={14} strokeWidth={2} />
-                  Crear cuenta en la web
-                </button>
-              </div>
+              <button
+                type="button"
+                className="glass-btn flex w-full items-center justify-center gap-2 rounded-lg py-2.5"
+                onClick={() => void openWebLogin()}
+                disabled={busy || loading}
+                style={{
+                  fontFamily: "'Geist Variable', sans-serif",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  opacity: busy || loading ? 0.55 : 1,
+                }}
+              >
+                <ExternalLink size={14} strokeWidth={2} />
+                Sincronizar con la web
+              </button>
             </GlassCard>
           ) : null}
 

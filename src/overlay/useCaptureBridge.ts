@@ -8,6 +8,13 @@ export function useCaptureBridge() {
   const analyserFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // Trackeamos la ultima promesa de arrayBuffer() del MediaRecorder.
+    // Como recorder.ondataavailable hace el conversion async, sin esto el
+    // chunk final puede llegar al main process despues de que processRecording
+    // ya empezo, dejando un blob webm incompleto que Deepgram rechaza con
+    // "corrupt or unsupported data". Pasa sobre todo despues de sleep/inactividad.
+    let pendingChunkPromise: Promise<void> = Promise.resolve();
+
     const stopAnalyser = () => {
       if (analyserFrameRef.current !== null) {
         cancelAnimationFrame(analyserFrameRef.current);
@@ -18,21 +25,37 @@ export function useCaptureBridge() {
       window.mushu.emitAudioChunk({ level: 0, ts: Date.now() });
     };
 
-    const stopCapture = () => {
+    const stopCapture = async () => {
       stopAnalyser();
       const recorder = mediaRecorderRef.current;
-      if (recorder && recorder.state !== "inactive") recorder.stop();
       mediaRecorderRef.current = null;
+      if (recorder && recorder.state !== "inactive") {
+        const stopped = new Promise<void>((resolve) => {
+          recorder.addEventListener("stop", () => resolve(), { once: true });
+        });
+        recorder.stop();
+        await stopped;
+        await pendingChunkPromise;
+        window.mushu.emitAudioChunk({ done: true, ts: Date.now() });
+      }
       for (const track of streamRef.current?.getTracks() ?? []) track.stop();
       streamRef.current = null;
     };
 
-    const startCapture = async () => {
-      stopCapture();
-      console.info("[capture] starting microphone capture");
+    const startCapture = async (deviceId?: string | null) => {
+      await stopCapture();
+      console.info("[capture] starting microphone capture", deviceId ? `device=${deviceId}` : "(default)");
+
+      // Verificar si hay micrófonos disponibles
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const mics = devices.filter((d) => d.kind === "audioinput");
+      if (mics.length === 0) {
+        throw new Error("NO_MICROPHONE");
+      }
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
@@ -48,7 +71,7 @@ export function useCaptureBridge() {
 
       recorder.ondataavailable = (event) => {
         if (!event.data || event.data.size === 0) return;
-        void event.data.arrayBuffer().then((buffer) => {
+        pendingChunkPromise = event.data.arrayBuffer().then((buffer) => {
           console.info(`[capture] audio chunk ${buffer.byteLength} bytes`);
           window.mushu.emitAudioChunk({
             bytes: buffer,
@@ -86,8 +109,10 @@ export function useCaptureBridge() {
 
     const unsubs: Array<Promise<() => void>> = [];
     unsubs.push(
-      listen("recording_started", () => {
-        void startCapture().catch((error) => {
+      listen("recording_started", (event) => {
+        const payload = event.payload as { microphone?: string | null } | null;
+        const deviceId = payload?.microphone;
+        void startCapture(deviceId).catch((error) => {
           window.mushu.emitAudioChunk({
             error: error instanceof Error ? error.message : String(error),
             ts: Date.now(),
@@ -98,17 +123,17 @@ export function useCaptureBridge() {
     unsubs.push(
       listen("recording_stopped", () => {
         console.info("[capture] stopping microphone capture");
-        stopCapture();
+        void stopCapture();
       }),
     );
     unsubs.push(
       listen("dictation_cancelled", () => {
-        stopCapture();
+        void stopCapture();
       }),
     );
 
     return () => {
-      stopCapture();
+      void stopCapture();
       for (const u of unsubs) void u.then((off) => off());
     };
   }, []);

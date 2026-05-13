@@ -23,6 +23,18 @@ import { HistoryPage } from "@/pages/HistoryPage";
 import { MODE_COLORS, MODE_ICONS, MODE_ICONS_BY_NAME, MODE_LABELS, MODE_NAMES, modeColor, modeLabel } from "@/lib/modes";
 import type { ModeName, NavSection } from "@/lib/types";
 
+function isMicBusyError(message: string): boolean {
+  // Detecta errores de getUserMedia cuando otra app tiene el mic en exclusivo
+  // (OBS, Discord, Zoom, Teams, etc.) o cuando Windows lo bloquea por permiso.
+  return /could not start audio source|no readable|not readable|already in use|in use by another|notreadableerror|hardware/i.test(
+    message,
+  );
+}
+
+function isNoMicrophoneError(message: string): boolean {
+  return message === "NO_MICROPHONE";
+}
+
 function RowCopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const onCopy = async (e: React.MouseEvent) => {
@@ -515,6 +527,9 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     <p style={{ fontFamily: "'Space Mono', monospace", fontSize: "11px", color: "var(--text-muted)" }}>
                       Suelta para transcribir
                     </p>
+                    <p style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "var(--text-muted)", opacity: 0.7 }}>
+                      Pulsa <kbd style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", padding: "1px 5px", borderRadius: "4px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}>Esc</kbd> para cancelar
+                    </p>
                   </div>
                 </motion.div>
               )}
@@ -598,13 +613,53 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   <div
                     className="rounded-[12px] p-4"
                     style={{
-                      background: "rgba(220,38,38,0.08)",
-                      border: "0.5px solid rgba(220,38,38,0.25)",
+                      background: isNoMicrophoneError(errorMessage) ? "rgba(251,146,60,0.08)" : "rgba(220,38,38,0.08)",
+                      border: isNoMicrophoneError(errorMessage) ? "0.5px solid rgba(251,146,60,0.25)" : "0.5px solid rgba(220,38,38,0.25)",
                     }}
                   >
-                    <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "14px", fontWeight: 500, color: "var(--delta-red)" }}>
-                      {errorMessage}
-                    </p>
+                    {isNoMicrophoneError(errorMessage) ? (
+                      <div className="flex flex-col gap-3">
+                        <div>
+                          <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "14px", fontWeight: 600, color: "rgb(251,146,60)", marginBottom: "4px" }}>
+                            No hay micrófono conectado
+                          </p>
+                          <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "12.5px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                            Conecta un micrófono o selecciona uno en Ajustes para empezar a dictar.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onNavigate?.("settings")}
+                          className="self-start rounded-full px-4 py-2 text-xs font-bold transition hover:scale-[1.02]"
+                          style={{ background: "var(--accent-primary)", color: "#000" }}
+                        >
+                          Ir a Ajustes
+                        </button>
+                      </div>
+                    ) : isMicBusyError(errorMessage) ? (
+                      <div className="flex flex-col gap-3">
+                        <div>
+                          <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "14px", fontWeight: 600, color: "var(--delta-red)", marginBottom: "4px" }}>
+                            No pude usar el micrófono
+                          </p>
+                          <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "12.5px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                            Otra app (OBS, Discord, Zoom, Teams) lo está usando en modo exclusivo. Cerrala, o desactivá el modo exclusivo en Windows desde la configuración de sonido.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void tauri.openMicrophoneSettings()}
+                          className="self-start rounded-full px-4 py-2 text-xs font-bold transition hover:scale-[1.02]"
+                          style={{ background: "var(--accent-primary)", color: "#000" }}
+                        >
+                          Abrir configuración de micrófono
+                        </button>
+                      </div>
+                    ) : (
+                      <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "14px", fontWeight: 500, color: "var(--delta-red)" }}>
+                        {errorMessage}
+                      </p>
+                    )}
                   </div>
                 </motion.div>
               )}

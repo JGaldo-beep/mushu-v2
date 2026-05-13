@@ -1,6 +1,6 @@
-export type ModeName = "DEFAULT" | "EMAIL" | "NOTE";
+export type ModeName = "DEFAULT" | "EMAIL" | "NOTE" | "RAPPI";
 
-export type ModeIconName = "Mic" | "Mail" | "StickyNote";
+export type ModeIconName = "Mic" | "Mail" | "StickyNote" | "ShoppingCart";
 
 export type ModeInfo = {
   name: ModeName;
@@ -40,6 +40,7 @@ export type FrontendState = {
   auto_translate_enabled: boolean;
   auto_translate_target: string;
   account: MushuAccount | null;
+  rappi_connected?: boolean;
 };
 
 export type MushuEntitlement = {

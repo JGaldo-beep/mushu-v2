@@ -6,6 +6,7 @@ type OnboardingSnapshot = {
   hotkey: string;
   ptt_hotkey: string;
   account: MushuAccount | null;
+  api_base_url: string;
 };
 
 function parseOnboardingDone(fs: FrontendState & { onboardingCompleted?: boolean }): boolean {
@@ -32,6 +33,7 @@ export function useOnboarding() {
           hotkey: fs.hotkey,
           ptt_hotkey: fs.ptt_hotkey,
           account: fs.account,
+          api_base_url: fs.api_base_url,
         });
         setOpen(!done);
       } catch (err) {

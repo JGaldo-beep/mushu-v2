@@ -1,7 +1,7 @@
 {
   "name": "mushu-v2",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.3",
   "productName": "Mushu",
   "description": "Mushu Electron app",
   "author": "JGaldo",
@@ -17,7 +17,8 @@
     "build": "npm run build:icons && npm run build:renderer",
     "start": "electron .",
     "pack:win": "npm run build && electron-builder --win --dir",
-    "dist:win": "npm run build && electron-builder --win nsis"
+    "dist:win": "npm run build && electron-builder --win nsis",
+    "release": "npm run build && electron-builder --win nsis --publish always"
   },
   "build": {
     "appId": "com.juangaldo.mushu",
@@ -28,10 +29,13 @@
     },
     "files": [
       "dist/**/*",
+      "public/**/*",
+      "build/icon.ico",
       "main.js",
       "preload.cjs",
       "package.json",
-      ".env"
+      ".env",
+      "src/rappi/**/*"
     ],
     "asar": true,
     "asarUnpack": [
@@ -46,7 +50,7 @@
       }
     ],
     "win": {
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
       "icon": "build/icon.ico",
       "target": [
         "nsis"
@@ -61,6 +65,11 @@
       "shortcutName": "Mushu",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "JGaldo-beep",
+      "repo": "mushu-v2"
     }
   },
   "dependencies": {
@@ -69,10 +78,12 @@
     "@fontsource/space-mono": "^5.2.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.3",
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.525.0",
     "motion": "^12.38.0",
     "next-themes": "^0.4.6",
+    "openai": "^6.37.0",
     "radix-ui": "^1.4.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

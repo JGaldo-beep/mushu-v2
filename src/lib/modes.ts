@@ -1,37 +1,42 @@
-import { Mail, Mic, StickyNote, type LucideIcon } from "lucide-react";
+import { Mail, Mic, ShoppingCart, StickyNote, type LucideIcon } from "lucide-react";
 import type { ModeIconName, ModeInfo, ModeName } from "./types";
 
 export const MODE_ICONS: Record<ModeIconName, LucideIcon> = {
   Mic,
   Mail,
   StickyNote,
+  ShoppingCart,
 };
 
 export const MODE_LABELS: Record<ModeName, string> = {
   DEFAULT: "General",
   EMAIL: "Correo",
   NOTE: "Nota",
+  RAPPI: "Rappi",
 };
 
 export const MODE_DESCRIPTIONS: Record<ModeName, string> = {
   DEFAULT: "Transcripción limpia, sin retoques.",
   EMAIL: "Tono formal y párrafos estructurados.",
   NOTE: "Casual, viñetas y fragmentos permitidos.",
+  RAPPI: "Asistente de voz para Rappi.",
 };
 
 export const MODE_COLORS: Record<ModeName, string> = {
   DEFAULT: "#d1ff3a",
   EMAIL: "#5fb5d8",
   NOTE: "#cfc0e5",
+  RAPPI: "#ff6b1a",
 };
 
 export const MODE_ICONS_BY_NAME: Record<ModeName, ModeIconName> = {
   DEFAULT: "Mic",
   EMAIL: "Mail",
   NOTE: "StickyNote",
+  RAPPI: "ShoppingCart",
 };
 
-export const MODE_NAMES: ModeName[] = ["DEFAULT", "EMAIL", "NOTE"];
+export const MODE_NAMES: ModeName[] = ["DEFAULT", "EMAIL", "NOTE", "RAPPI"];
 
 export const DEFAULT_MODE: ModeInfo = {
   name: "DEFAULT",

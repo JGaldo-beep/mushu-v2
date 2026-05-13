@@ -18,5 +18,10 @@ export const tauri = {
   clearHistory: () => window.mushu.invoke<void>("clear_history"),
   copyToClipboard: (text: string) => window.mushu.invoke<void>("copy_to_clipboard", { text }),
   openExternalUrl: (url: string) => window.mushu.invoke<void>("open_external_url", { url }),
+  openMicrophoneSettings: () => window.mushu.invoke<void>("open_microphone_settings"),
   setMode: (mode: ModeName) => window.mushu.invoke<void>("set_mode", { mode }),
+  rappiConnect: () => window.mushu.invoke<FrontendState>("rappi_connect"),
+  rappiDisconnect: () => window.mushu.invoke<FrontendState>("rappi_disconnect"),
+  getRappiStatus: () =>
+    window.mushu.invoke<{ connected: boolean; connecting: boolean }>("rappi_get_status"),
 };

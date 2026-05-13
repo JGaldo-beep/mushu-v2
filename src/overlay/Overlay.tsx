@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Pause, Pin, Play } from "lucide-react";
 import { ModeBadge } from "@/overlay/components/ModeBadge";
@@ -14,6 +15,17 @@ const transition = { duration: 0.22, ease } as const;
 
 export function Overlay() {
   useCaptureBridge();
+
+  useEffect(() => {
+    const off = window.mushu.on("rappi_speak", (payload: unknown) => {
+      const audio = (payload as { audio?: string })?.audio;
+      if (audio) {
+        new Audio(`data:audio/mpeg;base64,${audio}`).play().catch(console.error);
+      }
+    });
+    return off;
+  }, []);
+
   const {
     mode,
     modeBannerOnly,

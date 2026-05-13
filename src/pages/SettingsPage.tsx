@@ -403,7 +403,7 @@ export function SettingsPage() {
                   id="ptt_hotkey"
                   value={draft?.ptt_hotkey ?? ""}
                   onChange={(e) => setField("ptt_hotkey", e.target.value)}
-                  placeholder="Ctrl+Shift+Space"
+                  placeholder="F9"
                   className="glass-input rounded-lg"
                   style={{
                     fontFamily: "'Space Mono', monospace",

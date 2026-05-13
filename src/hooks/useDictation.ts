@@ -110,6 +110,14 @@ export function useDictation() {
       setState((s) => ({ ...s, mode: normalizeMode(m as ModeInfo) }));
     });
 
+    const unlistenCancelled = listen("dictation_cancelled", () => {
+      if (clearTimerRef.current) {
+        window.clearTimeout(clearTimerRef.current);
+        clearTimerRef.current = null;
+      }
+      setState((s) => ({ ...s, status: "idle", resultText: null, errorMessage: null }));
+    });
+
     const unlistenError = listen("transcription_error", (event) => {
       const msg = String(event.payload ?? "Error de transcripción.");
       setState((s) => ({ ...s, status: "error", errorMessage: msg }));
@@ -131,6 +139,7 @@ export function useDictation() {
       unlistenModeSwitch.then((f) => f());
       unlistenError.then((f) => f());
       unlistenGroq.then((f) => f());
+      unlistenCancelled.then((f) => f());
       if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
     };
   }, [scheduleClear]);
