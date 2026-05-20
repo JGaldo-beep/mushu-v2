@@ -18,10 +18,15 @@ export function Overlay() {
 
   useEffect(() => {
     const off = window.mushu.on("rappi_speak", (payload: unknown) => {
-      const audio = (payload as { audio?: string })?.audio;
-      if (audio) {
-        new Audio(`data:audio/mpeg;base64,${audio}`).play().catch(console.error);
-      }
+      const b64 = (payload as { audio?: string })?.audio;
+      if (!b64) return;
+      // data: URIs are blocked by CSP (media-src 'self' blob:), so convert to blob URL.
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: "audio/mpeg" });
+      const url = URL.createObjectURL(blob);
+      const el = new Audio(url);
+      el.onended = () => URL.revokeObjectURL(url);
+      el.play().catch(console.error);
     });
     return off;
   }, []);
