@@ -7,7 +7,6 @@ declare global {
       on(eventName: string, callback: (payload: unknown) => void): () => void;
       emitAudioChunk(chunk: {
         bytes?: ArrayBuffer;
-        done?: boolean;
         error?: string;
         level?: number;
         mimeType?: string;

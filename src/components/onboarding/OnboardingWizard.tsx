@@ -1,8 +1,8 @@
-import { ExternalLink } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
 import { ShortcutKbd } from "@/components/ShortcutKbd";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { listen } from "@/lib/events";
 import { tauri } from "@/lib/tauri";
 import type { MushuAccount, NavSection } from "@/lib/types";
@@ -20,25 +20,28 @@ type Props = {
   hotkey: string;
   pttHotkey: string;
   account: MushuAccount | null;
-  apiBaseUrl: string;
   onComplete: () => Promise<void>;
   onNavigateSettings: (section: NavSection) => void;
+  onAuthChanged: () => void;
 };
 
 export function OnboardingWizard({
   hotkey,
   pttHotkey,
   account,
-  apiBaseUrl,
   onComplete,
   onNavigateSettings,
+  onAuthChanged,
 }: Props) {
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState(account?.user.email || "");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
   const [confettiSeed, setConfettiSeed] = useState(0);
   const [signedInEmail, setSignedInEmail] = useState(account?.user.email || null);
   const [testText, setTestText] = useState<string>("");
-  const webBaseUrl = apiBaseUrl.replace(/\/$/, "");
 
   const dictationParts = hotkey.split("+");
   const pttParts = pttHotkey.split("+");
@@ -60,14 +63,6 @@ export function OnboardingWizard({
     };
   }, []);
 
-  // Actualizar signedInEmail cuando la cuenta cambie (por deep link)
-  useEffect(() => {
-    if (account?.user.email && account.user.email !== signedInEmail) {
-      setSignedInEmail(account.user.email);
-      setConfettiSeed((s) => s + 1);
-    }
-  }, [account, signedInEmail]);
-
   const finish = async () => {
     setBusy(true);
     try {
@@ -77,11 +72,19 @@ export function OnboardingWizard({
     }
   };
 
-  const openWebLogin = async () => {
+  const handleLogin = async () => {
+    setAuthError(null);
+    setAuthBusy(true);
     try {
-      await tauri.openExternalUrl(`${webBaseUrl}/mushu/login`);
-    } catch {
-      // silently ignore
+      const next = await tauri.login(email, password);
+      setSignedInEmail(next.account?.user.email || email);
+      setPassword("");
+      setConfettiSeed((s) => s + 1);
+      onAuthChanged();
+    } catch (e) {
+      setAuthError(String(e));
+    } finally {
+      setAuthBusy(false);
     }
   };
 
@@ -165,22 +168,45 @@ export function OnboardingWizard({
               ) : (
                 <div className="space-y-4">
                   <p>
-                    Conectá tu cuenta para activar tu <strong className="text-foreground">trial de Mushu</strong>.
+                    Iniciá sesión para activar tu <strong className="text-foreground">trial de Mushu</strong>. No necesitás configurar nada más.
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    Se abrirá el navegador para que inicies sesión. Tu cuenta se sincronizará automáticamente.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    disabled={busy}
-                    onClick={() => void openWebLogin()}
-                  >
-                    <ExternalLink size={14} strokeWidth={2} />
-                    Sincronizar con la web
-                  </Button>
+                  <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+                    <div className="space-y-2">
+                      <Input
+                        type="email"
+                        autoComplete="email"
+                        spellCheck={false}
+                        placeholder="correo@dominio.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={authBusy || busy}
+                      />
+                      <Input
+                        type="password"
+                        autoComplete="current-password"
+                        placeholder="Contraseña"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={authBusy || busy}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") void handleLogin();
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busy || authBusy || !email.trim() || !password}
+                      onClick={() => void handleLogin()}
+                    >
+                      {authBusy ? "Entrando..." : "Iniciar sesión"}
+                    </Button>
+                    {authError ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {authError}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               )}
             </div>
@@ -262,7 +288,7 @@ export function OnboardingWizard({
               <Button
                 type="button"
                 size="sm"
-                disabled={busy}
+                disabled={busy || authBusy}
                 onClick={() => setStep((s) => s + 1)}
               >
                 Siguiente
