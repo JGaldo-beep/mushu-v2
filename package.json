@@ -1,7 +1,7 @@
 {
   "name": "mushu-v2",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "productName": "Mushu",
   "description": "Mushu Electron app",
   "author": "JGaldo",
@@ -17,12 +17,18 @@
     "build": "npm run build:icons && npm run build:renderer",
     "start": "electron .",
     "pack:win": "npm run build && electron-builder --win --dir",
-    "dist:win": "npm run build && electron-builder --win nsis"
+    "dist:win": "npm run build && electron-builder --win nsis",
+    "release:win": "npm run build && electron-builder --win nsis --publish always"
   },
   "build": {
     "appId": "com.juangaldo.mushu",
     "productName": "Mushu",
     "artifactName": "${productName}-Setup.${ext}",
+    "publish": {
+      "provider": "github",
+      "owner": "JGaldo-beep",
+      "repo": "mushu-v2"
+    },
     "directories": {
       "output": "release"
     },

@@ -1,6 +1,42 @@
 {
   "version": 1,
   "skills": {
+    "deepgram-js-audio-intelligence": {
+      "source": "deepgram/deepgram-js-sdk",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/deepgram-js-audio-intelligence/SKILL.md",
+      "computedHash": "765fb6a515d557b0a079d025dc28aeef82d19690173f0fea6e9b369335d07b51"
+    },
+    "deepgram-js-conversational-stt": {
+      "source": "deepgram/deepgram-js-sdk",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/deepgram-js-conversational-stt/SKILL.md",
+      "computedHash": "8db15d31d3783ecac4fc41b11a0f5f771fde436bf122cfaf2ba1517b2f9d9b8a"
+    },
+    "deepgram-js-management-api": {
+      "source": "deepgram/deepgram-js-sdk",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/deepgram-js-management-api/SKILL.md",
+      "computedHash": "990600b132d8d980b8ade798314b14f89718914b55215014a25e3572b67ae7f0"
+    },
+    "deepgram-js-speech-to-text": {
+      "source": "deepgram/deepgram-js-sdk",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/deepgram-js-speech-to-text/SKILL.md",
+      "computedHash": "3662ba203445f16efb97ed5898e9a4b6432b9fac4d38e5543161f9efb617b0ed"
+    },
+    "deepgram-js-text-to-speech": {
+      "source": "deepgram/deepgram-js-sdk",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/deepgram-js-text-to-speech/SKILL.md",
+      "computedHash": "65d1aa21bdf51a6aa492c58f2185ce8942aedd5da4bb4b2dda4da68fa0030e06"
+    },
+    "deepgram-js-voice-agent": {
+      "source": "deepgram/deepgram-js-sdk",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/deepgram-js-voice-agent/SKILL.md",
+      "computedHash": "fccb50dbdf5ed165f32fb41b3469e50cb49af096a99e56901c330d7ef8bf5f9e"
+    },
     "docs-electron": {
       "source": "imgly/agent-skills",
       "sourceType": "github",

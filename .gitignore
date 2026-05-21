@@ -143,6 +143,7 @@ vite.config.ts.timestamp-*
 .vite/
 
 .claude
+.agents
 
 # Electron-builder output (installers, unpacked builds)
 release/
@@ -153,3 +154,4 @@ release/
 .DS_Store
 Thumbs.db
 desktop.ini
+tmpclaude-*
