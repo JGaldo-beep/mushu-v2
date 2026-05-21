@@ -57,6 +57,8 @@ const DEFAULT_SETTINGS = {
   ai_formatting_enabled: true,
   auto_translate_enabled: false,
   auto_translate_target: "en",
+  deepgram_replacements: [],
+  spoken_language: "auto",
 };
 
 let mainWindow = null;
@@ -82,6 +84,9 @@ let modeBannerTimer = null;
 let primaryHotkeyDown = false;
 let primaryHotkeyStartedAt = 0;
 let pttHotkeyDown = false;
+let ctrlReleasedAt = 0;
+let syntheticCtrlSpaceActive = false;
+const CTRL_SEQUENTIAL_TOLERANCE_MS = 500;
 let uiohookStarted = false;
 let deepgramSocket = null;
 let deepgramSocketReady = false;
@@ -122,10 +127,12 @@ function resolveDistPath(fileName) {
 }
 
 function getFrontendState() {
+  const deepgramApiKey = getDeepgramApiKey();
   return {
     mode: currentMode,
     has_groq_key: Boolean(accountCache),
-    has_deepgram_key: Boolean(accountCache),
+    has_deepgram_key: Boolean(deepgramApiKey || accountCache),
+    has_deepgram_direct_key: Boolean(deepgramApiKey),
     // El renderer enumera los micros reales via navigator.mediaDevices.enumerateDevices().
     microphones: [],
     account: accountCache,
@@ -255,6 +262,12 @@ async function ensureStorageLoaded() {
   try {
     secrets = JSON.parse(await fs.readFile(secretsPath, "utf-8"));
   } catch {}
+  const normalizedDeepgramKey = getDeepgramApiKey();
+  if (normalizedDeepgramKey) {
+    secrets.deepgram_api_key = normalizedDeepgramKey;
+  } else {
+    delete secrets.deepgram_api_key;
+  }
   try {
     historyStore = JSON.parse(await fs.readFile(historyPath, "utf-8"));
   } catch {}
@@ -791,6 +804,22 @@ function emitLiveTranscript() {
   });
 }
 
+function normalizeDeepgramApiKey(input) {
+  let value = String(input || "").trim();
+  while (value.length >= 2) {
+    const first = value[0];
+    const last = value[value.length - 1];
+    const wrappedInQuotes = (first === `"` && last === `"`) || (first === `'` && last === `'`);
+    if (!wrappedInQuotes) break;
+    value = value.slice(1, -1).trim();
+  }
+  return value;
+}
+
+function getDeepgramApiKey() {
+  return normalizeDeepgramApiKey(secrets.deepgram_api_key);
+}
+
 function resetDeepgramStreamState() {
   deepgramFinalTranscript = "";
   deepgramInterimTranscript = "";
@@ -800,12 +829,25 @@ function resetDeepgramStreamState() {
   broadcast("live_transcript", { text: "", isFinal: false });
 }
 
+function isDeepgramDirectChunk(chunk) {
+  return chunk?.bytes instanceof Uint8Array && chunk.streamFormat === "linear16";
+}
+
+function isDeepgramProxyChunk(chunk) {
+  return chunk?.bytes instanceof Uint8Array && !chunk.streamOnly;
+}
+
 function startDeepgramStream() {
   const previousSocket = deepgramSocket;
   if (previousSocket) {
     try {
       if (previousSocket.readyState === WebSocket.OPEN) {
-        previousSocket.send(JSON.stringify({ type: "close" }));
+        // Modo proxy: cierre con mensaje JSON; modo directo: cierre estándar WS
+        if (getDeepgramApiKey()) {
+          previousSocket.close();
+        } else {
+          previousSocket.send(JSON.stringify({ type: "close" }));
+        }
       }
       previousSocket.close();
     } catch {}
@@ -819,95 +861,218 @@ function startDeepgramStream() {
 
   void (async () => {
     try {
-      const { apiBaseUrl, accessToken } = await getBackendAuthContext();
-      const streamUrl = new URL(resolveMushuStreamUrl(apiBaseUrl));
-      streamUrl.searchParams.set("language", "es");
-      streamUrl.searchParams.set("content_type", "audio/webm");
-      streamUrl.searchParams.set("access_token", accessToken);
-
-      const socket = new WebSocket(streamUrl.toString(), {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      deepgramSocket = socket;
-      deepgramStreamDone = new Promise((resolve) => {
-        const done = () => resolve();
-        socket.once("close", done);
-        socket.once("error", done);
-      });
-
-      socket.on("open", () => {
-        deepgramSocketReady = true;
-        for (const chunk of capturedChunks) {
-          if (chunk?.bytes instanceof Uint8Array && socket.readyState === WebSocket.OPEN) {
-            socket.send(chunk.bytes);
-          }
-        }
-      });
-
-      socket.on("message", (raw) => {
-        // Si ya no somos el socket activo (timeout vencido y nueva grabacion empezo),
-        // ignoramos cualquier mensaje tardio para no contaminar el estado nuevo.
-        if (deepgramSocket !== socket) return;
-        try {
-          const data = JSON.parse(String(raw));
-          if (data.type === "ready") {
-            deepgramSocketReady = true;
-            return;
-          }
-          if (data.type === "transcript") {
-            const transcript = String(data.transcript || "").trim();
-            if (!transcript) return;
-            if (data.isFinal) {
-              deepgramFinalTranscript = [deepgramFinalTranscript, transcript]
-                .filter(Boolean)
-                .join(" ")
-                .replace(/\s+/g, " ")
-                .trim();
-              deepgramInterimTranscript = "";
-            } else {
-              deepgramInterimTranscript = transcript;
-            }
-            emitLiveTranscript();
-            return;
-          }
-          if (data.type === "done") {
-            const transcript = String(data.transcript || "").trim();
-            if (transcript) {
-              deepgramFinalTranscript = transcript;
-              deepgramInterimTranscript = "";
-              emitLiveTranscript();
-            }
-            deepgramStreamSeconds = Number(data.seconds || 0);
-            applyConsumedSecondsToAccount(deepgramStreamSeconds);
-            broadcast("frontend_state_changed", {});
-            refreshAccountInBackground();
-            return;
-          }
-          if (data.type === "error") {
-            deepgramSocketFailed = true;
-            broadcast("transcription_error", String(data.message || "Deepgram stream error."));
-          }
-        } catch (error) {
-          console.warn("[stt:stream] bad message:", error instanceof Error ? error.message : String(error));
-        }
-      });
-
-      socket.on("close", () => {
-        deepgramSocketReady = false;
-      });
-      socket.on("error", (error) => {
-        deepgramSocketFailed = true;
-        deepgramSocketReady = false;
-        console.warn("[stt:stream] failed:", error instanceof Error ? error.message : String(error));
-      });
+      const apiKey = getDeepgramApiKey();
+      if (apiKey) {
+        startDeepgramDirectStream(apiKey);
+      } else {
+        const { apiBaseUrl, accessToken } = await getBackendAuthContext();
+        startDeepgramProxyStream(apiBaseUrl, accessToken);
+      }
     } catch (error) {
       deepgramSocketFailed = true;
       deepgramSocketReady = false;
       console.warn("[stt:stream] setup failed:", error instanceof Error ? error.message : String(error));
     }
   })();
+}
+
+function startDeepgramDirectStream(apiKey) {
+  const token = normalizeDeepgramApiKey(apiKey).replace(/^Token\s+/i, "").trim();
+  if (!token) {
+    deepgramSocketFailed = true;
+    deepgramSocketReady = false;
+    console.warn("[stt:direct] api key vacía o inválida");
+    return;
+  }
+  const params = new URLSearchParams({
+    model: "nova-3",
+    language: "multi",
+    encoding: "linear16",
+    sample_rate: "16000",
+    channels: "1",
+    smart_format: "true",
+    punctuate: "true",
+    numerals: "true",
+    vad_events: "true",
+    endpointing: "300",
+    interim_results: "true",
+    utterance_end_ms: "1000",
+  });
+
+  const replaceParam = (settings.deepgram_replacements || [])
+    .filter((r) => r.from && r.to)
+    .map((r) => `${r.from}:${r.to}`)
+    .join(",");
+  if (replaceParam) params.set("replace", replaceParam);
+  params.set("token", token);
+
+  const url = `wss://api.deepgram.com/v1/listen?${params.toString()}`;
+  console.info("[stt:direct] conectando a DeepGram (nova-3, multi, linear16/16k)");
+  const socket = new WebSocket(url);
+  deepgramSocket = socket;
+  deepgramStreamDone = new Promise((resolve) => {
+    socket.once("close", resolve);
+    socket.once("error", resolve);
+  });
+
+  socket.on("open", () => {
+    deepgramSocketReady = true;
+    for (const chunk of capturedChunks) {
+      if (isDeepgramDirectChunk(chunk) && socket.readyState === WebSocket.OPEN) {
+        socket.send(chunk.bytes);
+      }
+    }
+  });
+
+  socket.on("message", (raw) => {
+    if (deepgramSocket !== socket) return;
+    try {
+      const data = JSON.parse(String(raw));
+      if (data.type !== "Results") return;
+      const transcript = (data.channel?.alternatives?.[0]?.transcript || "").trim();
+      if (!transcript) return;
+      if (data.is_final) {
+        deepgramFinalTranscript = [deepgramFinalTranscript, transcript]
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        deepgramInterimTranscript = "";
+      } else {
+        deepgramInterimTranscript = transcript;
+      }
+      emitLiveTranscript();
+    } catch (error) {
+      console.warn("[stt:direct] bad message:", error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  socket.on("close", () => { deepgramSocketReady = false; });
+  socket.on("unexpected-response", (_request, response) => {
+    deepgramSocketFailed = true;
+    deepgramSocketReady = false;
+    let body = "";
+    response.on("data", (chunk) => {
+      body += String(chunk || "");
+    });
+    response.on("end", () => {
+      const detail = body.trim();
+      console.warn(
+        `[stt:direct] handshake failed: ${response.statusCode || "?"} ${response.statusMessage || ""}${
+          detail ? ` — ${detail}` : ""
+        }`,
+      );
+      if (response.statusCode === 401 || response.statusCode === 403) {
+        console.info("[stt:direct] auth error — fallback automático a proxy");
+        void (async () => {
+          try {
+            const { apiBaseUrl, accessToken } = await getBackendAuthContext();
+            deepgramSocketFailed = false;
+            startDeepgramProxyStream(apiBaseUrl, accessToken);
+          } catch (err) {
+            deepgramSocketFailed = true;
+            console.warn(
+              "[stt:direct→proxy] fallback fallido:",
+              err instanceof Error ? err.message : String(err),
+            );
+            broadcast("transcription_error", "Fallo de transcripción. Verifica tu conexión.");
+          }
+        })();
+      }
+    });
+  });
+  socket.on("error", (error) => {
+    deepgramSocketFailed = true;
+    deepgramSocketReady = false;
+    console.warn("[stt:direct] error:", error instanceof Error ? error.message : String(error));
+  });
+}
+
+function startDeepgramProxyStream(apiBaseUrl, accessToken) {
+  const lang = settings.spoken_language || "auto";
+  const deepgramLang = lang === "auto" ? "multi" : lang;
+
+  const streamUrl = new URL(resolveMushuStreamUrl(apiBaseUrl));
+  streamUrl.searchParams.set("language", deepgramLang);
+  streamUrl.searchParams.set("interim_results", "true");
+  streamUrl.searchParams.set("endpointing", "200");
+  streamUrl.searchParams.set("utterance_end_ms", "1000");
+  streamUrl.searchParams.set("vad_events", "true");
+  streamUrl.searchParams.set("content_type", "audio/webm");
+  streamUrl.searchParams.set("access_token", accessToken);
+  console.info(`[stt:proxy] conectando (language=${deepgramLang}, endpointing=200, interim_results=true)`);
+
+  const socket = new WebSocket(streamUrl.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  deepgramSocket = socket;
+  deepgramStreamDone = new Promise((resolve) => {
+    const done = () => resolve();
+    socket.once("close", done);
+    socket.once("error", done);
+  });
+
+  socket.on("open", () => {
+    deepgramSocketReady = true;
+    for (const chunk of capturedChunks) {
+      if (isDeepgramProxyChunk(chunk) && socket.readyState === WebSocket.OPEN) {
+        socket.send(chunk.bytes);
+      }
+    }
+  });
+
+  socket.on("message", (raw) => {
+    if (deepgramSocket !== socket) return;
+    try {
+      const data = JSON.parse(String(raw));
+      if (data.type === "ready") {
+        deepgramSocketReady = true;
+        return;
+      }
+      if (data.type === "transcript") {
+        const transcript = String(data.transcript || "").trim();
+        if (!transcript) return;
+        if (data.isFinal) {
+          deepgramFinalTranscript = [deepgramFinalTranscript, transcript]
+            .filter(Boolean)
+            .join(" ")
+            .replace(/\s+/g, " ")
+            .trim();
+          deepgramInterimTranscript = "";
+        } else {
+          deepgramInterimTranscript = transcript;
+        }
+        emitLiveTranscript();
+        return;
+      }
+      if (data.type === "done") {
+        const transcript = String(data.transcript || "").trim();
+        if (transcript) {
+          deepgramFinalTranscript = transcript;
+          deepgramInterimTranscript = "";
+          emitLiveTranscript();
+        }
+        deepgramStreamSeconds = Number(data.seconds || 0);
+        applyConsumedSecondsToAccount(deepgramStreamSeconds);
+        broadcast("frontend_state_changed", {});
+        refreshAccountInBackground();
+        return;
+      }
+      if (data.type === "error") {
+        deepgramSocketFailed = true;
+        broadcast("transcription_error", String(data.message || "Deepgram stream error."));
+      }
+    } catch (error) {
+      console.warn("[stt:proxy] bad message:", error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  socket.on("close", () => { deepgramSocketReady = false; });
+  socket.on("error", (error) => {
+    deepgramSocketFailed = true;
+    deepgramSocketReady = false;
+    console.warn("[stt:proxy] failed:", error instanceof Error ? error.message : String(error));
+  });
 }
 
 async function finishDeepgramStream() {
@@ -926,9 +1091,14 @@ async function finishDeepgramStream() {
       resolve();
     });
     try {
+      const isDirect = Boolean(getDeepgramApiKey());
       if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "close" }));
-      } else if (socket.readyState === WebSocket.CONNECTING) {
+        if (isDirect) {
+          socket.send(JSON.stringify({ type: "Finalize" }));
+        } else {
+          socket.send(JSON.stringify({ type: "close" }));
+        }
+      } else if (socket.readyState === WebSocket.CONNECTING && !isDirect) {
         socket.once("open", () => socket.send(JSON.stringify({ type: "close" })));
       }
     } catch {
@@ -936,6 +1106,12 @@ async function finishDeepgramStream() {
       resolve();
     }
   });
+
+  try {
+    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+      socket.close();
+    }
+  } catch {}
 
   if (deepgramSocket === socket) {
     deepgramSocket = null;
@@ -962,7 +1138,7 @@ async function transcribeAudio(audioChunks, mimeType) {
     headers: {
       "Content-Type": contentType,
       "X-Mushu-Duration-Ms": String(durationMs),
-      "X-Mushu-Language": "es",
+      "X-Mushu-Language": settings.spoken_language === "auto" || !settings.spoken_language ? "multi" : settings.spoken_language,
     },
     body: audioBlob,
   });
@@ -975,7 +1151,7 @@ async function transcribeAudio(audioChunks, mimeType) {
       headers: {
         "Content-Type": contentType,
         "X-Mushu-Duration-Ms": String(durationMs),
-        "X-Mushu-Language": "es",
+        "X-Mushu-Language": settings.spoken_language === "auto" || !settings.spoken_language ? "multi" : settings.spoken_language,
       },
       body: audioBlob,
     });
@@ -1001,7 +1177,7 @@ async function processRecording() {
       .filter((it) => typeof it.text === "string")
       .map((it) => it.text);
     const audioChunks = capturedChunks
-      .filter((it) => it.bytes instanceof Uint8Array)
+      .filter((it) => it.bytes instanceof Uint8Array && !it.streamOnly)
       .map((it) => it.bytes);
     const mimeType = capturedChunks.find((it) => it.mimeType)?.mimeType || "audio/webm";
     console.info(
@@ -1218,6 +1394,7 @@ function togglePause() {
 function setHotkeys() {
   globalShortcut.unregisterAll();
   const hotkey = normalizeAccelerator(settings.hotkey);
+  const modeHotkey = normalizeAccelerator(settings.mode_hotkey);
   const cycleModeHotkey = normalizeAccelerator(settings.cycle_mode_hotkey);
   const pauseHotkey = normalizeAccelerator(settings.pause_hotkey);
   const primaryShortcut = parseShortcutForHook(settings.hotkey);
@@ -1234,8 +1411,11 @@ function setHotkeys() {
   ) {
     console.error(`No se pudo registrar hotkey principal: ${hotkey}`);
   }
-  if (cycleModeHotkey && !globalShortcut.register(cycleModeHotkey, cycleMode)) {
-    console.error(`No se pudo registrar hotkey de modo: ${cycleModeHotkey}`);
+  if (modeHotkey && !globalShortcut.register(modeHotkey, cycleMode)) {
+    console.error(`No se pudo registrar hotkey de modo: ${modeHotkey}`);
+  }
+  if (cycleModeHotkey && modeHotkey !== cycleModeHotkey && !globalShortcut.register(cycleModeHotkey, cycleMode)) {
+    console.error(`No se pudo registrar hotkey de ciclo de modo: ${cycleModeHotkey}`);
   }
   if (
     pauseHotkey &&
@@ -1251,14 +1431,26 @@ function setHotkeys() {
     uIOhook.removeAllListeners("keyup");
     uIOhook.on("keydown", (evt) => {
       const key = Number(evt.keycode);
+
+      // Detectar press secuencial: si Space se presiona poco después de soltar Ctrl
+      const isSequentialCtrlSpace =
+        key === UiohookKey.Space &&
+        !evt.ctrlKey &&
+        primaryShortcut.ctrl &&
+        primaryShortcut.keycode === UiohookKey.Space &&
+        Date.now() - ctrlReleasedAt < CTRL_SEQUENTIAL_TOLERANCE_MS;
+
+      const effectiveEvt = isSequentialCtrlSpace ? { ...evt, ctrlKey: true } : evt;
+      if (isSequentialCtrlSpace) syntheticCtrlSpaceActive = true;
+
       // PTT puro: mantener para grabar, soltar para enviar (sin entrar a hands-off).
-      if (pttShortcut && matchesShortcut(evt, pttShortcut)) {
+      if (pttShortcut && matchesShortcut(effectiveEvt, pttShortcut)) {
         if (pttHotkeyDown) return;
         pttHotkeyDown = true;
         if (!recording) startRecording({ handsOffMode: false });
         return;
       }
-      if (matchesShortcut(evt, primaryShortcut) && !globalShortcut.isRegistered(hotkey)) {
+      if (matchesShortcut(effectiveEvt, primaryShortcut) && !globalShortcut.isRegistered(hotkey)) {
         if (primaryHotkeyDown) return;
         primaryHotkeyDown = true;
         primaryHotkeyStartedAt = Date.now();
@@ -1270,12 +1462,24 @@ function setHotkeys() {
       }
     });
     uIOhook.on("keyup", (evt) => {
-      if (pttShortcut && matchesShortcut(evt, pttShortcut)) {
+      const key = Number(evt.keycode);
+
+      // Registrar cuando Ctrl se suelta para la ventana de tolerancia
+      if (key === UiohookKey.Ctrl || key === UiohookKey.CtrlRight) {
+        ctrlReleasedAt = Date.now();
+      }
+
+      // Si Space se suelta como parte de un press secuencial sintético
+      const isSyntheticRelease = key === UiohookKey.Space && syntheticCtrlSpaceActive;
+      if (isSyntheticRelease) syntheticCtrlSpaceActive = false;
+      const effectiveEvt = isSyntheticRelease ? { ...evt, ctrlKey: true } : evt;
+
+      if (pttShortcut && matchesShortcut(effectiveEvt, pttShortcut)) {
         pttHotkeyDown = false;
         if (recording) stopRecording();
         return;
       }
-      if (!matchesShortcut(evt, primaryShortcut)) return;
+      if (!matchesShortcut(effectiveEvt, primaryShortcut)) return;
       const heldForMs = Date.now() - primaryHotkeyStartedAt;
       primaryHotkeyDown = false;
 
@@ -1339,10 +1543,24 @@ function registerIpc(updateTrayMenu) {
         return getFrontendState();
       case "test_groq":
         return accountCache ? "Groq listo desde el backend de Mushu." : "Inicia sesión para usar Groq desde backend.";
+      case "save_deepgram_api_key": {
+        const key = normalizeDeepgramApiKey(args.key);
+        if (key) {
+          secrets.deepgram_api_key = key;
+        } else {
+          delete secrets.deepgram_api_key;
+        }
+        await persistState();
+        broadcast("frontend_state_changed", {});
+        return;
+      }
       case "test_deepgram":
+        if (getDeepgramApiKey()) {
+          return "DeepGram directo listo (nova-3, multi-idioma, smart_format, numerals, punctuate).";
+        }
         return accountCache
-          ? "Deepgram listo desde el backend de Mushu. El streaming usa MUSHU_STREAM_URL o el proxy local :3001."
-          : "Inicia sesión para usar Deepgram desde backend.";
+          ? "DeepGram via backend Mushu. Agrega tu API key para conexión directa."
+          : "Inicia sesión o configura tu API key de DeepGram.";
       case "get_history":
         return historyStore;
       case "clear_history":
@@ -1408,17 +1626,24 @@ function registerIpc(updateTrayMenu) {
     if (!recording || paused) return;
     const bytes = toAudioBytes(payload?.bytes);
     if (bytes) {
-      capturedChunks.push({
+      const chunk = {
         bytes,
         mimeType: payload.mimeType,
+        sampleRate: payload.sampleRate,
+        streamFormat: payload.streamFormat,
+        streamOnly: payload.streamOnly === true,
         ts: payload.ts,
-      });
+      };
+      capturedChunks.push(chunk);
       if (
         settings.transcription_provider === "deepgram" &&
         deepgramSocketReady &&
         deepgramSocket?.readyState === WebSocket.OPEN
       ) {
-        deepgramSocket.send(bytes);
+        const hasDirectKey = Boolean(getDeepgramApiKey());
+        const canSendDirect = hasDirectKey && isDeepgramDirectChunk(chunk);
+        const canSendProxy = !hasDirectKey && isDeepgramProxyChunk(chunk);
+        if (canSendDirect || canSendProxy) deepgramSocket.send(bytes);
       }
       return;
     }

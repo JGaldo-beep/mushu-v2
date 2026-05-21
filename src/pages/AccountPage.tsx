@@ -346,8 +346,8 @@ export function AccountPage() {
                   }}
                 >
                   {minutes === null
-                    ? "Tu sesion llego desde la web. Revisa la conexion del backend para traer tus minutos."
-                    : `Tienes ${minutes} minutos disponibles. Cada dictado con Deepgram descuenta segundos del trial y se sincroniza con tu dashboard.`}
+                    ? "Recarga para ver tus minutos disponibles."
+                    : `Tienes ${minutes} minutos disponibles. Cada dictado descuenta segundos de tu plan.`}
                 </p>
               </div>
             </div>

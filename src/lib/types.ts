@@ -15,6 +15,8 @@ export type ProcessingMode = "cloud_first" | "local_only";
 
 export type TranscriptionProvider = "groq" | "deepgram";
 
+export type DeepgramReplacement = { from: string; to: string };
+
 export type FrontendState = {
   mode: ModeInfo;
   hotkey: string;
@@ -30,6 +32,7 @@ export type FrontendState = {
   transcription_provider: TranscriptionProvider;
   has_groq_key: boolean;
   has_deepgram_key: boolean;
+  has_deepgram_direct_key: boolean;
   microphones: string[];
   selected_microphone: string | null;
   theme: ThemePref;
@@ -39,6 +42,8 @@ export type FrontendState = {
   ai_formatting_enabled: boolean;
   auto_translate_enabled: boolean;
   auto_translate_target: string;
+  deepgram_replacements: DeepgramReplacement[];
+  spoken_language?: string;
   account: MushuAccount | null;
 };
 
@@ -82,6 +87,8 @@ export type SaveSettingsInput = {
   ai_formatting_enabled?: boolean;
   auto_translate_enabled?: boolean;
   auto_translate_target?: string;
+  deepgram_replacements?: DeepgramReplacement[];
+  spoken_language?: string;
 };
 
 export type HistoryItem = {

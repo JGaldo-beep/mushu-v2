@@ -117,8 +117,8 @@ export function useDictation() {
     });
 
     const unlistenGroq = listen("groq_error", (event) => {
-      const msg = String(event.payload ?? "Groq no disponible.");
-      setState((s) => ({ ...s, status: "error", errorMessage: `Groq: ${msg}` }));
+      const msg = String(event.payload ?? "Error al transcribir. Intenta de nuevo.");
+      setState((s) => ({ ...s, status: "error", errorMessage: msg }));
       scheduleClear(ERROR_AUTO_CLEAR_MS);
     });
 

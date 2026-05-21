@@ -1,19 +1,24 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ExternalLink,
+  Eye,
+  EyeOff,
   Globe,
   Info,
   Keyboard,
   LifeBuoy,
   Mic,
+  Plus,
   RefreshCw,
+  Replace,
   Save,
   ShieldCheck,
   Volume2,
   Waves,
+  X,
   type LucideIcon,
 } from "lucide-react";
-import { type ReactNode } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/GlassCard";
 import { GlassSelect } from "@/components/GlassSelect";
@@ -26,6 +31,8 @@ import { Slider } from "@/components/ui/slider";
 import { useAudioDevices } from "@/hooks/useAudioDevices";
 import { useSettings } from "@/hooks/useSettings";
 import { useSpokenLanguage } from "@/hooks/useSpokenLanguage";
+import { tauri } from "@/lib/tauri";
+import type { DeepgramReplacement } from "@/lib/types";
 
 const APP_VERSION = "0.1.1";
 
@@ -130,11 +137,207 @@ function SettingRow({
   );
 }
 
+function mapKey(key: string): string | null {
+  if (["Control", "Shift", "Alt", "Meta"].includes(key)) return null;
+  if (key === " ") return "Space";
+  if (key.length === 1) return key.toUpperCase();
+  const named: Record<string, string> = {
+    Escape: "Escape", Tab: "Tab", Enter: "Return",
+    Backspace: "Backspace", Delete: "Delete",
+    ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
+    Home: "Home", End: "End", PageUp: "PageUp", PageDown: "PageDown",
+  };
+  if (key in named) return named[key];
+  if (/^F\d+$/.test(key)) return key;
+  return null;
+}
+
+function buildCombo(e: React.KeyboardEvent): string | null {
+  const mods: string[] = [];
+  if (e.ctrlKey) mods.push("Ctrl");
+  if (e.shiftKey) mods.push("Shift");
+  if (e.altKey) mods.push("Alt");
+  if (e.metaKey) mods.push("Meta");
+  const k = mapKey(e.key);
+  if (!k) return mods.length ? mods.join("+") : null;
+  return [...mods, k].join("+");
+}
+
+function KeyChips({ combo, dim }: { combo: string; dim?: boolean }) {
+  const parts = combo ? combo.split("+").filter(Boolean) : [];
+  if (!parts.length) return <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>—</span>;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {parts.map((p, i) => (
+        <span key={i} className="inline-flex items-center gap-1">
+          {i > 0 && <span style={{ color: "var(--text-muted)", fontSize: "11px", opacity: 0.6 }}>+</span>}
+          <span
+            style={{
+              fontFamily: "'Space Mono', monospace",
+              fontSize: "11px",
+              fontWeight: 700,
+              padding: "3px 7px",
+              borderRadius: "5px",
+              background: dim ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.09)",
+              border: "0.5px solid rgba(255,255,255,0.13)",
+              color: dim ? "var(--text-muted)" : "var(--text-primary)",
+              letterSpacing: "0.01em",
+              boxShadow: "0 1px 0 rgba(0,0,0,0.25)",
+              display: "inline-block",
+            }}
+          >
+            {p}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function HotkeyCapture({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [capturing, setCapturing] = useState(false);
+  const [preview, setPreview] = useState("");
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const start = () => {
+    setCapturing(true);
+    setPreview("");
+    setTimeout(() => btnRef.current?.focus(), 0);
+  };
+
+  const cancel = () => {
+    setCapturing(false);
+    setPreview("");
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!capturing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === "Escape") { cancel(); return; }
+    const combo = buildCombo(e);
+    if (combo) setPreview(combo);
+  };
+
+  const onKeyUp = (e: React.KeyboardEvent) => {
+    if (!capturing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const k = mapKey(e.key);
+    if (!k || ["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+    const combo = buildCombo(e);
+    if (combo) {
+      onChange(combo);
+      setCapturing(false);
+      setPreview("");
+    }
+  };
+
+  if (capturing) {
+    return (
+      <button
+        ref={btnRef}
+        type="button"
+        onKeyDown={onKeyDown}
+        onKeyUp={onKeyUp}
+        onBlur={cancel}
+        style={{
+          fontFamily: "'Geist Variable', sans-serif",
+          fontSize: "12px",
+          fontWeight: 500,
+          padding: "6px 12px",
+          borderRadius: "8px",
+          background: "rgba(209,255,58,0.07)",
+          border: "0.5px solid rgba(209,255,58,0.45)",
+          color: "rgb(209,255,58)",
+          cursor: "default",
+          outline: "none",
+          minWidth: "160px",
+          textAlign: "center",
+          animation: "pulse 1.4s ease-in-out infinite",
+        }}
+      >
+        {preview ? <KeyChips combo={preview} dim /> : "Presiona la combinación…"}
+      </button>
+    );
+  }
+
+  return (
+    <div className="inline-flex items-center gap-2">
+      <KeyChips combo={value} />
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={start}
+        className="glass-btn rounded-lg px-2.5 py-1"
+        style={{
+          fontFamily: "'Geist Variable', sans-serif",
+          fontSize: "11px",
+          fontWeight: 500,
+          color: "var(--text-muted)",
+        }}
+      >
+        Cambiar
+      </button>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { draft, loading, saving, isDirty, setField, save, reset, refresh } = useSettings();
   const { language, setLanguage } = useSpokenLanguage();
   const { devices: audioDevices, refresh: refreshAudioDevices } = useAudioDevices();
   const ready = !loading && !!draft;
+
+  const [dgKeyInput, setDgKeyInput] = useState("");
+  const [dgKeyVisible, setDgKeyVisible] = useState(false);
+  const [dgKeySaving, setDgKeySaving] = useState(false);
+
+  const onSaveDeepgramKey = async () => {
+    setDgKeySaving(true);
+    try {
+      await tauri.saveDeepgramApiKey(dgKeyInput.trim());
+      setDgKeyInput("");
+      toast.success("Código de activación guardado");
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setDgKeySaving(false);
+    }
+  };
+
+  const onDeleteDeepgramKey = async () => {
+    setDgKeySaving(true);
+    try {
+      await tauri.saveDeepgramApiKey("");
+      toast.success("Código de activación eliminado");
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setDgKeySaving(false);
+    }
+  };
+
+  const replacements: DeepgramReplacement[] = draft?.deepgram_replacements ?? [];
+
+  const addReplacement = () => {
+    setField("deepgram_replacements", [...replacements, { from: "", to: "" }]);
+  };
+
+  const updateReplacement = (i: number, field: "from" | "to", value: string) => {
+    const updated = replacements.map((r, idx) => (idx === i ? { ...r, [field]: value } : r));
+    setField("deepgram_replacements", updated);
+  };
+
+  const removeReplacement = (i: number) => {
+    setField("deepgram_replacements", replacements.filter((_, idx) => idx !== i));
+  };
 
   const onSave = async () => {
     try {
@@ -323,12 +526,15 @@ export function SettingsPage() {
             <SectionHeader
               title="Transcripción"
               icon={Waves}
-              description="Speech-to-text administrado por el backend de Mushu"
+              description="Convierte tu voz en texto mientras dictas"
             />
             <SettingRow
-              label="Servicio"
-              description="Mushu transcribe tu voz de forma segura usando nuestros servidores. Tus credenciales nunca salen de tu cuenta."
-              isLast
+              label="Modo activo"
+              description={
+                draft?.has_deepgram_direct_key
+                  ? "Transcripción mejorada activa: detecta idiomas automáticamente, puntuación y números."
+                  : "Transcripción estándar. Activa el plan premium para más precisión."
+              }
               control={
                 <span
                   className="inline-flex items-center rounded-full px-2.5 py-1"
@@ -336,32 +542,170 @@ export function SettingsPage() {
                     fontFamily: "'Space Mono', monospace",
                     fontSize: "10px",
                     fontWeight: 700,
-                    background: draft?.account
+                    background: draft?.has_deepgram_direct_key
                       ? "rgba(22,163,74,0.10)"
-                      : "rgba(251,146,60,0.10)",
-                    border: draft?.account
+                      : draft?.account
+                        ? "rgba(209,255,58,0.10)"
+                        : "rgba(251,146,60,0.10)",
+                    border: draft?.has_deepgram_direct_key
                       ? "0.5px solid rgba(22,163,74,0.30)"
-                      : "0.5px solid rgba(251,146,60,0.30)",
-                    color: draft?.account ? "var(--delta-green)" : "rgb(251,146,60)",
+                      : draft?.account
+                        ? "0.5px solid rgba(209,255,58,0.30)"
+                        : "0.5px solid rgba(251,146,60,0.30)",
+                    color: draft?.has_deepgram_direct_key
+                      ? "var(--delta-green)"
+                      : draft?.account
+                        ? "rgb(209,255,58)"
+                        : "rgb(251,146,60)",
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
                   }}
                 >
-                  {draft?.account ? "Conectado" : "Login requerido"}
+                  {draft?.has_deepgram_direct_key ? "Premium" : draft?.account ? "Estándar" : "Sin conexión"}
                 </span>
               }
             />
-            <div
-              className="mx-4 mb-3 rounded-lg px-3 py-2"
+            <SettingRow
+              label="Código de activación"
+              description={
+                draft?.has_deepgram_direct_key
+                  ? "Código guardado. Ingresa uno nuevo para actualizarlo."
+                  : "Ingresa tu código para activar la transcripción premium."
+              }
+              isLast
+              control={
+                <div className="flex items-center gap-2">
+                  {draft?.has_deepgram_direct_key ? (
+                    <button
+                      type="button"
+                      className="glass-btn rounded-lg px-3 py-1.5"
+                      onClick={onDeleteDeepgramKey}
+                      disabled={dgKeySaving}
+                      style={{
+                        fontFamily: "'Geist Variable', sans-serif",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        color: "rgb(251,146,60)",
+                      }}
+                    >
+                      Desactivar
+                    </button>
+                  ) : null}
+                  <div className="relative flex items-center">
+                    <input
+                      type={dgKeyVisible ? "text" : "password"}
+                      value={dgKeyInput}
+                      onChange={(e) => setDgKeyInput(e.target.value)}
+                      placeholder="Código..."
+                      className="glass-input rounded-lg pr-8"
+                      style={{
+                        fontFamily: "'Space Mono', monospace",
+                        fontSize: "11px",
+                        padding: "6px 28px 6px 10px",
+                        width: "160px",
+                        outline: "none",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setDgKeyVisible((v) => !v)}
+                      className="absolute right-2 text-(--text-muted) hover:text-(--text-secondary)"
+                      tabIndex={-1}
+                    >
+                      {dgKeyVisible ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="glass-btn rounded-lg px-3 py-1.5"
+                    onClick={onSaveDeepgramKey}
+                    disabled={dgKeySaving || !dgKeyInput.trim()}
+                    style={{
+                      fontFamily: "'Geist Variable', sans-serif",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {dgKeySaving ? "Guardando…" : "Guardar"}
+                  </button>
+                </div>
+              }
+            />
+          </GlassCard>
+
+          {/* Find & Replace */}
+          <GlassCard className="overflow-hidden">
+            <SectionHeader
+              title="Buscar y reemplazar"
+              icon={Replace}
+              description="Corrige palabras que Mushu transcribe mal — se aplican en tiempo real"
+            />
+            <div className="px-4 pb-3">
+              {replacements.length === 0 && (
+                <p
+                  style={{
+                    fontFamily: "'Geist Variable', sans-serif",
+                    fontSize: "12px",
+                    color: "var(--text-muted)",
+                    paddingTop: "8px",
+                    paddingBottom: "4px",
+                  }}
+                >
+                  Sin reemplazos. Agrega pares para corregir palabras mal transcritas.
+                </p>
+              )}
+              {replacements.map((r, i) => (
+                <div key={i} className="mb-2 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={r.from}
+                    onChange={(e) => updateReplacement(i, "from", e.target.value)}
+                    placeholder="buscar"
+                    className="glass-input flex-1 rounded-lg"
+                    style={{
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: "11px",
+                      padding: "6px 10px",
+                      outline: "none",
+                    }}
+                  />
+                  <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>→</span>
+                  <input
+                    type="text"
+                    value={r.to}
+                    onChange={(e) => updateReplacement(i, "to", e.target.value)}
+                    placeholder="reemplazar con"
+                    className="glass-input flex-1 rounded-lg"
+                    style={{
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: "11px",
+                      padding: "6px 10px",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="glass-btn rounded-lg p-1.5"
+                    onClick={() => removeReplacement(i)}
+                    title="Eliminar"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="glass-btn mt-1 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5"
+                onClick={addReplacement}
                 style={{
                   fontFamily: "'Geist Variable', sans-serif",
-                  fontSize: "11.5px",
-                  background: "rgba(209,255,58,0.07)",
-                  border: "0.5px solid rgba(209,255,58,0.22)",
-                  color: "var(--text-secondary)",
+                  fontSize: "12px",
+                  fontWeight: 500,
                 }}
               >
-              Puedes ver lo que hablas en vivo en la cápsula del overlay mientras dictas.
+                <Plus size={13} />
+                Agregar par
+              </button>
             </div>
           </GlassCard>
 
@@ -370,72 +714,46 @@ export function SettingsPage() {
             <SectionHeader
               title="Atajos"
               icon={Keyboard}
-              description="Atajos globales que funcionan desde cualquier app"
+              description="Presiona «Cambiar» y luego la combinación de teclas que quieras usar"
             />
             <SettingRow
               label="Dictado"
-              description="Mantén pulsado para push-to-talk; tap rápido para entrar a hands-off (otro tap o ESC para terminar)."
-              htmlFor="hotkey"
+              description="Mantén pulsado para grabar; tap rápido para manos libres."
               control={
-                <input
-                  id="hotkey"
+                <HotkeyCapture
                   value={draft?.hotkey ?? ""}
-                  onChange={(e) => setField("hotkey", e.target.value)}
-                  placeholder="Ctrl+Space"
-                  className="glass-input rounded-lg"
-                  style={{
-                    fontFamily: "'Space Mono', monospace",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    padding: "6px 10px",
-                    width: "160px",
-                    outline: "none",
-                  }}
+                  onChange={(v) => setField("hotkey", v)}
                 />
               }
             />
             <SettingRow
               label="Push-to-talk"
-              description="Mantén pulsado mientras hablás; al soltar se envía el texto. Sin ambigüedad de tap."
-              htmlFor="ptt_hotkey"
+              description="Mantén pulsado mientras hablás; al soltar se envía el texto."
               control={
-                <input
-                  id="ptt_hotkey"
+                <HotkeyCapture
                   value={draft?.ptt_hotkey ?? ""}
-                  onChange={(e) => setField("ptt_hotkey", e.target.value)}
-                  placeholder="Ctrl+Shift+Space"
-                  className="glass-input rounded-lg"
-                  style={{
-                    fontFamily: "'Space Mono', monospace",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    padding: "6px 10px",
-                    width: "160px",
-                    outline: "none",
-                  }}
+                  onChange={(v) => setField("ptt_hotkey", v)}
+                />
+              }
+            />
+            <SettingRow
+              label="Cambiar modo"
+              description="Alterna entre General, Correo y Nota sin abrir la app."
+              control={
+                <HotkeyCapture
+                  value={draft?.mode_hotkey ?? ""}
+                  onChange={(v) => setField("mode_hotkey", v)}
                 />
               }
             />
             <SettingRow
               label="Pausa"
-              description="Pausa la grabación sin terminarla. Otro tap reanuda."
-              htmlFor="pause_hotkey"
+              description="Pausa la grabación sin terminarla. Otra vez reanuda."
               isLast
               control={
-                <input
-                  id="pause_hotkey"
+                <HotkeyCapture
                   value={draft?.pause_hotkey ?? ""}
-                  onChange={(e) => setField("pause_hotkey", e.target.value)}
-                  placeholder="Ctrl+Shift+P"
-                  className="glass-input rounded-lg"
-                  style={{
-                    fontFamily: "'Space Mono', monospace",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    padding: "6px 10px",
-                    width: "160px",
-                    outline: "none",
-                  }}
+                  onChange={(v) => setField("pause_hotkey", v)}
                 />
               }
             />

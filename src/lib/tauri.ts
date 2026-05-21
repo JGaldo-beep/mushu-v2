@@ -1,5 +1,9 @@
 import type { FrontendState, HistoryItem, ModeName, SaveSettingsInput } from "./types";
 
+export function patchSettings(patch: Partial<SaveSettingsInput>) {
+  return window.mushu.invoke<FrontendState>("save_settings", { input: patch });
+}
+
 export const tauri = {
   getFrontendState: () => window.mushu.invoke<FrontendState>("get_frontend_state"),
   login: (email: string, password: string) =>

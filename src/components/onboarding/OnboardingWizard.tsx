@@ -126,7 +126,7 @@ export function OnboardingWizard({
                 puede reescribir el texto según el modo que elijas (correo, nota o voz directa).
               </p>
               <p>
-                Ahora el trial vive en tu cuenta: inicias sesión una vez y Mushu usa tus minutos disponibles sin pedirte API keys.
+                Ahora el trial vive en tu cuenta: inicias sesión una vez y Mushu usa tus minutos disponibles sin configuraciones adicionales.
               </p>
             </div>
           )}

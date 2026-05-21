@@ -10,6 +10,9 @@ declare global {
         error?: string;
         level?: number;
         mimeType?: string;
+        sampleRate?: number;
+        streamFormat?: "linear16";
+        streamOnly?: boolean;
         text?: string;
         ts?: number;
       }): void;

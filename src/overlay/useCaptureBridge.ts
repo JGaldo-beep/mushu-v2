@@ -5,14 +5,35 @@ export function useCaptureBridge() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const workletRef = useRef<AudioWorkletNode | null>(null);
   const analyserFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const TARGET_SAMPLE_RATE = 16000;
+    const WORKLET_CHUNK_SIZE = 1024;
+    const WORKLET_MODULE_URL = new URL("./linear16-capture.worklet.js", import.meta.url).toString();
+
+    const toLinear16 = (input: Float32Array, sourceSampleRate: number) => {
+      const ratio = sourceSampleRate / TARGET_SAMPLE_RATE;
+      const outputLength = Math.max(1, Math.floor(input.length / ratio));
+      const pcm = new Int16Array(outputLength);
+
+      for (let i = 0; i < outputLength; i += 1) {
+        const sample = input[Math.min(input.length - 1, Math.floor(i * ratio))] ?? 0;
+        const clamped = Math.max(-1, Math.min(1, sample));
+        pcm[i] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
+      }
+
+      return pcm;
+    };
+
     const stopAnalyser = () => {
       if (analyserFrameRef.current !== null) {
         cancelAnimationFrame(analyserFrameRef.current);
         analyserFrameRef.current = null;
       }
+      workletRef.current?.disconnect();
+      workletRef.current = null;
       void audioContextRef.current?.close().catch(() => {});
       audioContextRef.current = null;
       window.mushu.emitAudioChunk({ level: 0, ts: Date.now() });
@@ -49,7 +70,6 @@ export function useCaptureBridge() {
       recorder.ondataavailable = (event) => {
         if (!event.data || event.data.size === 0) return;
         void event.data.arrayBuffer().then((buffer) => {
-          console.info(`[capture] audio chunk ${buffer.byteLength} bytes`);
           window.mushu.emitAudioChunk({
             bytes: buffer,
             mimeType,
@@ -59,12 +79,40 @@ export function useCaptureBridge() {
       };
       recorder.start(250);
 
-      const audioContext = new AudioContext();
+      const audioContext = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE });
       audioContextRef.current = audioContext;
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 512;
       source.connect(analyser);
+
+      await audioContext.audioWorklet.addModule(WORKLET_MODULE_URL);
+      const worklet = new AudioWorkletNode(audioContext, "linear16-capture", {
+        numberOfInputs: 1,
+        numberOfOutputs: 0,
+        channelCount: 1,
+      });
+      workletRef.current = worklet;
+      const pendingSamples: number[] = [];
+      worklet.port.onmessage = (event) => {
+        const raw = event.data;
+        const input = raw instanceof Float32Array ? raw : Float32Array.from(raw || []);
+        if (input.length === 0) return;
+        for (const value of input) pendingSamples.push(value);
+        while (pendingSamples.length >= WORKLET_CHUNK_SIZE) {
+          const chunk = Float32Array.from(pendingSamples.splice(0, WORKLET_CHUNK_SIZE));
+          const pcm = toLinear16(chunk, audioContext.sampleRate);
+          window.mushu.emitAudioChunk({
+            bytes: pcm.buffer,
+            mimeType: "audio/linear16",
+            sampleRate: TARGET_SAMPLE_RATE,
+            streamFormat: "linear16",
+            streamOnly: true,
+            ts: Date.now(),
+          });
+        }
+      };
+      source.connect(worklet);
 
       const data = new Uint8Array(analyser.fftSize);
       const tick = () => {

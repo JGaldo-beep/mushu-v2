@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { patchSettings } from "../lib/tauri";
 
 const STORAGE_KEY = "mushu.spoken_language.v1";
 const DEFAULT_VALUE = "auto";
 
-/**
- * Persists the user's preferred spoken language in localStorage.
- * Backend integration (passing it to Whisper) is a follow-up.
- */
 export function useSpokenLanguage() {
   const [language, setLanguageState] = useState<string>(() => {
     try {
@@ -16,12 +13,15 @@ export function useSpokenLanguage() {
     }
   });
 
+  // Keep localStorage and main-process settings in sync.
+  // Fires on mount (syncs persisted value on startup) and on every change.
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, language);
     } catch {
       /* ignore */
     }
+    void patchSettings({ spoken_language: language }).catch(() => {});
   }, [language]);
 
   const setLanguage = useCallback((next: string) => {
