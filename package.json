@@ -51,7 +51,6 @@
       }
     ],
     "win": {
-      "signAndEditExecutable": false,
       "icon": "build/icon.ico",
       "target": [
         "nsis"

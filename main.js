@@ -33,10 +33,19 @@ app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
 app.commandLine.appendSwitch("disk-cache-size", "0");
 
 const MODE_MAP = {
-  DEFAULT: { name: "DEFAULT", label: "General", color: "#d1ff3a", icon: "Mic" },
-  EMAIL: { name: "EMAIL", label: "Correo", color: "#5fb5d8", icon: "Mail" },
-  NOTE: { name: "NOTE", label: "Nota", color: "#cfc0e5", icon: "StickyNote" },
+  DEFAULT: { name: "DEFAULT", label: "General", color: "#737373", icon: "Mic" },
+  EMAIL: { name: "EMAIL", label: "Email", color: "#737373", icon: "Mail" },
+  NOTE: { name: "NOTE", label: "Note", color: "#737373", icon: "StickyNote" },
 };
+
+// In dev, runtime assets live in public/. In production the renderer is built
+// by Vite which copies public/* to dist/*. Use this helper for any asset main.js
+// reads at runtime (tray icons, window icons, etc.) so we hit the right path
+// in both modes.
+function resolveAssetPath(relPath) {
+  const baseDir = devServerUrl ? "public" : "dist";
+  return path.join(__dirname, baseDir, relPath);
+}
 const MODE_ORDER = ["DEFAULT", "EMAIL", "NOTE"];
 const HANDS_OFF_TAP_THRESHOLD_MS = 250;
 const DEFAULT_SETTINGS = {
@@ -602,7 +611,7 @@ function createWindow(htmlFile, options) {
   const win = new BrowserWindow({
     show: false,
     backgroundColor: "#00000000",
-    icon: path.join(__dirname, "public", "mushu-icon.png"),
+    icon: resolveAssetPath("mushu-icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -645,7 +654,7 @@ function positionOverlay() {
 }
 
 function setupTray() {
-  const iconPath = path.join(__dirname, "public", "mushu-icon.png");
+  const iconPath = resolveAssetPath("mushu-icon.png");
   if (!fsSync.existsSync(iconPath)) return;
   tray = new Tray(iconPath);
   const showMainWindow = () => {
