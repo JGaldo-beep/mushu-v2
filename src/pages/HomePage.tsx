@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { CopyButton } from "@/components/CopyButton";
 import { tauri } from "@/lib/tauri";
+import { MetricCard } from "@/components/MetricCard";
 import { ModeChip } from "@/components/ModeChip";
 import { ShortcutKbd } from "@/components/ShortcutKbd";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -73,81 +74,6 @@ function relativeTime(iso: string) {
   if (diff < 86400) return `${Math.floor(diff / 3600)} h ago`;
   if (diff < 86400 * 2) return "yesterday";
   return then.toLocaleDateString("en-US", { day: "numeric", month: "short" });
-}
-
-interface MetricRowProps {
-  label: string;
-  value: string | number;
-  unit?: string;
-  delta?: number | null;
-  isLast?: boolean;
-}
-
-function MetricRow({ label, value, unit, delta, isLast }: MetricRowProps) {
-  const deltaSign = delta && delta > 0 ? "+" : "";
-  return (
-    <div
-      className="flex items-baseline justify-between gap-4 px-1 py-3.5"
-      style={{
-        borderBottom: isLast ? "none" : "0.5px solid var(--border)",
-      }}
-    >
-      <span
-        className="tracking-widest"
-        style={{
-          fontFamily: "'Space Mono', monospace",
-          fontSize: "10px",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          color: "var(--muted-foreground)",
-        }}
-      >
-        {label}
-      </span>
-      <div className="flex items-baseline gap-2">
-        {delta !== null && delta !== undefined ? (
-          <span
-            className="tabular"
-            style={{
-              fontFamily: "'Space Mono', monospace",
-              fontSize: "10px",
-              fontWeight: 500,
-              color: "var(--muted-foreground)",
-            }}
-          >
-            {deltaSign}
-            {delta}
-          </span>
-        ) : null}
-        <span
-          className="tabular"
-          style={{
-            fontFamily: "'Geist Variable', sans-serif",
-            fontSize: "22px",
-            fontWeight: 600,
-            color: "var(--foreground)",
-            letterSpacing: "-0.02em",
-            lineHeight: 1,
-          }}
-        >
-          {value}
-        </span>
-        {unit ? (
-          <span
-            style={{
-              fontFamily: "'Geist Variable', sans-serif",
-              fontSize: "11px",
-              fontWeight: 500,
-              color: "var(--muted-foreground)",
-              marginLeft: "2px",
-            }}
-          >
-            {unit}
-          </span>
-        ) : null}
-      </div>
-    </div>
-  );
 }
 
 type HomePageProps = {
@@ -411,52 +337,35 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
 
       {/* Scrollable content */}
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-        {/* Metrics — Linear-style horizontal list, hairline dividers */}
-        <div
-          style={{
-            border: "0.5px solid var(--border)",
-            borderRadius: "var(--radius)",
-            background: "var(--card)",
-            padding: "4px 16px",
-          }}
-        >
+        {/* Metrics — 4 cards in a grid */}
+        <div className="grid grid-cols-4 gap-3">
           {loading ? (
             Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={i}
-                className="py-3.5"
-                style={{
-                  borderBottom:
-                    i === 3 ? "none" : "0.5px solid var(--border)",
-                }}
-              >
-                <Skeleton style={{ height: "22px", maxWidth: "240px" }} />
-              </div>
+              <Skeleton key={i} style={{ height: "84px" }} />
             ))
           ) : (
             <>
-              <MetricRow
+              <MetricCard
                 label="Words today"
                 value={metrics.wordsToday}
                 delta={metrics.wordsTodayDelta ?? undefined}
               />
-              <MetricRow
+              <MetricCard
                 label="Words / wk."
                 value={metrics.wordsWeek}
                 delta={metrics.wordsWeekDelta ?? undefined}
               />
-              <MetricRow
+              <MetricCard
                 label="Min / wk."
                 value={metrics.minutesWeek}
                 unit="min"
                 delta={metrics.minutesWeekDelta ?? undefined}
               />
-              <MetricRow
+              <MetricCard
                 label="Avg. speed"
                 value={metrics.velocityToday}
                 unit={metrics.velocityToday !== "--" ? "wpm" : ""}
                 delta={metrics.velocityTodayDelta ?? undefined}
-                isLast
               />
             </>
           )}
