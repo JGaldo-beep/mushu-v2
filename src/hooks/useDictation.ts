@@ -111,7 +111,7 @@ export function useDictation() {
     });
 
     const unlistenError = listen("transcription_error", (event) => {
-      const msg = String(event.payload ?? "Error de transcripción.");
+      const msg = String(event.payload ?? "Transcription error.");
       setState((s) => ({ ...s, status: "error", errorMessage: msg }));
       scheduleClear(ERROR_AUTO_CLEAR_MS);
     });
@@ -130,7 +130,7 @@ export function useDictation() {
     });
 
     const unlistenGroq = listen("groq_error", (event) => {
-      const msg = String(event.payload ?? "Error al transcribir. Intenta de nuevo.");
+      const msg = String(event.payload ?? "Failed to transcribe. Try again.");
       setState((s) => ({ ...s, status: "error", errorMessage: msg }));
       scheduleClear(ERROR_AUTO_CLEAR_MS);
     });

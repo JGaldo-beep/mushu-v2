@@ -34,7 +34,7 @@ export function ModesPage() {
                 letterSpacing: "-0.01em",
               }}
             >
-              Modos
+              Modes
             </p>
             <p
               style={{
@@ -44,7 +44,7 @@ export function ModesPage() {
                 color: "var(--text-muted)",
               }}
             >
-              Elige cómo se procesa tu dictado
+              Choose how your dictation is processed
             </p>
           </div>
         </div>
@@ -109,7 +109,7 @@ export function ModesPage() {
                         }}
                       >
                         <Check size={10} strokeWidth={3} />
-                        Activo
+                        Active
                       </span>
                     )}
                   </div>
@@ -154,8 +154,8 @@ export function ModesPage() {
             lineHeight: 1.5,
           }}
         >
-          El modo activo se aplica a todas las transcripciones. Para personalizar el comportamiento
-          (formato, traducción, agente), abre <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>AI Features</strong>.
+          The active mode applies to all transcriptions. To customize behavior
+          (formatting, translation, agent), open <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>AI Features</strong>.
         </p>
       </div>
     </div>

@@ -8,21 +8,21 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAIFeatures } from "@/hooks/useAIFeatures";
 
 const LANGUAGES = [
-  { value: "en", label: "Inglés" },
-  { value: "es", label: "Español" },
-  { value: "fr", label: "Francés" },
-  { value: "de", label: "Alemán" },
-  { value: "pt", label: "Portugués" },
-  { value: "it", label: "Italiano" },
-  { value: "nl", label: "Neerlandés" },
-  { value: "pl", label: "Polaco" },
-  { value: "ru", label: "Ruso" },
-  { value: "tr", label: "Turco" },
-  { value: "ar", label: "Árabe" },
+  { value: "en", label: "English" },
+  { value: "es", label: "Spanish" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "pt", label: "Portuguese" },
+  { value: "it", label: "Italian" },
+  { value: "nl", label: "Dutch" },
+  { value: "pl", label: "Polish" },
+  { value: "ru", label: "Russian" },
+  { value: "tr", label: "Turkish" },
+  { value: "ar", label: "Arabic" },
   { value: "hi", label: "Hindi" },
-  { value: "ja", label: "Japonés" },
-  { value: "ko", label: "Coreano" },
-  { value: "zh", label: "Chino simplificado" },
+  { value: "ja", label: "Japanese" },
+  { value: "ko", label: "Korean" },
+  { value: "zh", label: "Chinese (Simplified)" },
 ];
 
 export function AIFeaturesPage() {
@@ -31,45 +31,47 @@ export function AIFeaturesPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div
-        className="mushu-topbar flex items-center justify-between px-5 py-3"
+        className="mushu-topbar flex items-center justify-between px-6 py-4"
         style={{ flexShrink: 0 }}
       >
         <div className="flex items-center gap-3">
-          <SidebarTrigger style={{ color: "var(--text-secondary)" }} />
+          <SidebarTrigger style={{ color: "var(--muted-foreground)" }} />
           <div>
-            <p
+            <h1
               style={{
                 fontFamily: "'Geist Variable', sans-serif",
-                fontSize: "16px",
+                fontSize: "20px",
                 fontWeight: 600,
-                color: "var(--text-primary)",
-                lineHeight: 1.2,
-                letterSpacing: "-0.01em",
+                color: "var(--foreground)",
+                lineHeight: 1.15,
+                letterSpacing: "-0.025em",
+                margin: 0,
               }}
             >
               AI Features
-            </p>
+            </h1>
             <p
               style={{
                 fontFamily: "'Geist Variable', sans-serif",
-                fontSize: "12px",
+                fontSize: "12.5px",
                 fontWeight: 450,
-                color: "var(--text-muted)",
+                color: "var(--muted-foreground)",
+                marginTop: "2px",
               }}
             >
-              Capas de IA aplicadas a tus transcripciones
+              AI layers applied to your transcriptions
             </p>
           </div>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         <div className="flex flex-col gap-3">
           <FeatureCard
             icon={Wand2}
             color="#0A0A0A"
             title="AI Formatting"
-            description="Refina gramática y puntuación antes de pegar."
+            description="Refines grammar and punctuation before pasting."
             value={ai.formattingEnabled}
             onChange={(v) => ai.setField("formattingEnabled", v)}
           />
@@ -77,31 +79,31 @@ export function AIFeaturesPage() {
           <InfoCard
             icon={Sparkles}
             color="#525252"
-            title="Modo agente"
-            description="Si seleccionás texto antes de dictar, Mushu usa lo que digas como instrucción y reemplaza la selección con el resultado. Sin atajo extra ni configuración."
-            example='Ejemplo: seleccionás "Hi, how are you?" → mantenés el atajo + decís "traducí al español" → te reemplaza con "Hola, ¿cómo estás?".'
+            title="Agent mode"
+            description="If you select text before dictating, Mushu uses what you say as the instruction and replaces the selection with the result. No extra shortcut or configuration."
+            example='Example: select "Hi, how are you?" → hold the shortcut + say "translate to Spanish" → replaces with "Hola, ¿cómo estás?".'
           />
 
           <FeatureCard
             icon={Languages}
             color="#737373"
             title="Auto-translate"
-            description="Traduce automáticamente al idioma seleccionado."
+            description="Automatically translates to the selected language."
             value={ai.autoTranslateEnabled}
             onChange={(v) => ai.setField("autoTranslateEnabled", v)}
             extra={
               ai.autoTranslateEnabled ? (
                 <div className="flex items-center gap-3 pt-3">
                   <span
+                    className="tracking-widest"
                     style={{
                       fontFamily: "'Space Mono', monospace",
                       fontSize: "10px",
-                      color: "var(--text-muted)",
+                      color: "var(--muted-foreground)",
                       textTransform: "uppercase",
-                      letterSpacing: "0.1em",
                     }}
                   >
-                    Idioma destino
+                    Target language
                   </span>
                   <div style={{ minWidth: "180px" }}>
                     <GlassSelect
@@ -122,11 +124,11 @@ export function AIFeaturesPage() {
             fontFamily: "'Geist Variable', sans-serif",
             fontSize: "11.5px",
             fontWeight: 450,
-            color: "var(--text-muted)",
+            color: "var(--muted-foreground)",
             lineHeight: 1.5,
           }}
         >
-          Estas funciones se aplican después de transcribir tu voz. Las podés activar y desactivar en cualquier momento.
+          These features run after your voice is transcribed. Toggle them on or off any time.
         </p>
       </div>
     </div>
@@ -159,7 +161,7 @@ function InfoCard({ icon: Icon, color, title, description, example }: InfoCardPr
           style={{
             width: "44px",
             height: "44px",
-            borderRadius: "12px",
+            borderRadius: "var(--radius)",
             background: `${color}14`,
             border: `0.5px solid ${color}30`,
             display: "flex",
@@ -176,7 +178,7 @@ function InfoCard({ icon: Icon, color, title, description, example }: InfoCardPr
               fontFamily: "'Geist Variable', sans-serif",
               fontSize: "14px",
               fontWeight: 600,
-              color: "var(--text-primary)",
+              color: "var(--foreground)",
               letterSpacing: "-0.005em",
               marginBottom: "3px",
             }}
@@ -188,7 +190,7 @@ function InfoCard({ icon: Icon, color, title, description, example }: InfoCardPr
               fontFamily: "'Geist Variable', sans-serif",
               fontSize: "12.5px",
               fontWeight: 450,
-              color: "var(--text-secondary)",
+              color: "color-mix(in oklab, var(--foreground) 65%, transparent)",
               lineHeight: 1.5,
             }}
           >
@@ -201,7 +203,7 @@ function InfoCard({ icon: Icon, color, title, description, example }: InfoCardPr
                 fontFamily: "'Geist Variable', sans-serif",
                 fontSize: "11.5px",
                 fontWeight: 450,
-                color: "var(--text-muted)",
+                color: "var(--muted-foreground)",
                 lineHeight: 1.5,
                 fontStyle: "italic",
               }}
@@ -223,7 +225,7 @@ function FeatureCard({ icon: Icon, color, title, description, value, onChange, e
           style={{
             width: "44px",
             height: "44px",
-            borderRadius: "12px",
+            borderRadius: "var(--radius)",
             background: `${color}14`,
             border: `0.5px solid ${color}30`,
             display: "flex",
@@ -242,7 +244,7 @@ function FeatureCard({ icon: Icon, color, title, description, value, onChange, e
                   fontFamily: "'Geist Variable', sans-serif",
                   fontSize: "14px",
                   fontWeight: 600,
-                  color: "var(--text-primary)",
+                  color: "var(--foreground)",
                   letterSpacing: "-0.005em",
                   marginBottom: "3px",
                 }}
@@ -254,7 +256,7 @@ function FeatureCard({ icon: Icon, color, title, description, value, onChange, e
                   fontFamily: "'Geist Variable', sans-serif",
                   fontSize: "12.5px",
                   fontWeight: 450,
-                  color: "var(--text-secondary)",
+                  color: "color-mix(in oklab, var(--foreground) 65%, transparent)",
                   lineHeight: 1.5,
                 }}
               >

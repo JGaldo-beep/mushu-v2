@@ -31,7 +31,7 @@ interface HistoryPageProps {
 
 function formatTimestamp(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleString("es-ES", {
+  return d.toLocaleString("en-US", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -54,11 +54,11 @@ function groupByDate(items: HistoryItem[]) {
     yesterday.setDate(today.getDate() - 1);
     let key: string;
     if (d.toDateString() === today.toDateString()) {
-      key = `Hoy — ${d.toLocaleDateString("es-ES", { day: "2-digit", month: "long" })}`;
+      key = `Today — ${d.toLocaleDateString("en-US", { day: "2-digit", month: "long" })}`;
     } else if (d.toDateString() === yesterday.toDateString()) {
-      key = `Ayer — ${d.toLocaleDateString("es-ES", { day: "2-digit", month: "long" })}`;
+      key = `Yesterday — ${d.toLocaleDateString("en-US", { day: "2-digit", month: "long" })}`;
     } else {
-      key = d.toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long" });
+      key = d.toLocaleDateString("en-US", { weekday: "long", day: "2-digit", month: "long" });
     }
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(item);
@@ -114,7 +114,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
                 letterSpacing: "-0.01em",
               }}
             >
-              Historial
+              History
             </p>
             <p
               style={{
@@ -124,7 +124,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
                 color: "var(--text-muted)",
               }}
             >
-              Tus últimas transcripciones
+              Your latest transcriptions
             </p>
           </div>
         </div>
@@ -146,7 +146,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar…"
+              placeholder="Search…"
               className="glass-input rounded-lg"
               style={{
                 paddingLeft: "32px",
@@ -168,31 +168,30 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
                 className="glass-btn rounded-lg p-2"
                 disabled={!items.length}
                 style={{ opacity: !items.length ? 0.4 : 1 }}
-                title="Borrar todo el historial"
+                title="Clear all history"
               >
                 <Trash2 style={{ width: "15px", height: "15px" }} strokeWidth={1.85} />
               </button>
             </DialogTrigger>
             <DialogContent
               style={{
-                background: "oklch(15% 0.08 209 / 0.96)",
-                border: "0.5px solid var(--glass-border)",
-                backdropFilter: "blur(20px) saturate(140%)",
-                color: "var(--text-primary)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 40px rgba(0,0,0,0.50)",
+                background: "var(--popover)",
+                border: "0.5px solid var(--border)",
+                color: "var(--popover-foreground)",
+                boxShadow: "0 12px 40px rgba(0, 0, 0, 0.12)",
               }}
             >
               <DialogHeader>
-                <DialogTitle style={{ color: "var(--text-primary)" }}>
-                  ¿Borrar el historial?
+                <DialogTitle style={{ color: "var(--foreground)" }}>
+                  Clear history?
                 </DialogTitle>
-                <DialogDescription style={{ color: "var(--text-secondary)" }}>
-                  Esta acción elimina todas las transcripciones. No se puede deshacer.
+                <DialogDescription style={{ color: "var(--muted-foreground)" }}>
+                  This removes all transcriptions. It can't be undone.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-                  Cancelar
+                  Cancel
                 </Button>
                 <Button
                   variant="destructive"
@@ -201,7 +200,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
                     setConfirmOpen(false);
                   }}
                 >
-                  Borrar
+                  Clear
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -229,7 +228,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
                 color: "var(--text-muted)",
               }}
             >
-              No hay coincidencias.
+              No matches.
             </p>
           )}
           {!loading && groups.length > 0 && (
@@ -326,7 +325,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
 
       <div className="flex items-center justify-between">
         <span style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "var(--text-muted)" }}>
-          {words} palabras
+          {words} words
         </span>
       </div>
     </GlassCard>
@@ -350,10 +349,10 @@ function EmptyState() {
       </div>
       <div>
         <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "14px", fontWeight: 600, color: "var(--text-secondary)" }}>
-          Aún no hay transcripciones
+          No transcriptions yet
         </p>
         <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "12px", fontWeight: 450, color: "var(--text-muted)", marginTop: "4px" }}>
-          Pulsa el atajo y dicta. Tus transcripciones aparecerán aquí.
+          Press the shortcut and dictate. Your transcriptions will show up here.
         </p>
       </div>
     </div>

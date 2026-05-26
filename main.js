@@ -534,7 +534,7 @@ async function getBackendAuthContext() {
   const { apiBaseUrl } = requireAuthConfig();
   const session = await getValidSession();
   if (!session?.access_token) {
-    throw new Error("Inicia sesión en Mushu para usar el trial.");
+    throw new Error("Sign in to Mushu to use the trial.");
   }
   return {
     apiBaseUrl,
@@ -579,7 +579,7 @@ async function callMushuJson(pathname, body) {
 
   if (response.status === 401) {
     const refreshed = await refreshSupabaseSession();
-    if (!refreshed?.access_token) throw new Error("La sesión de Mushu expiró. Inicia sesión otra vez.");
+    if (!refreshed?.access_token) throw new Error("Your Mushu session expired. Please sign in again.");
     accessToken = refreshed.access_token;
     response = await fetchWithBackendAuth(`${apiBaseUrl}${pathname}`, accessToken, {
       method: "POST",
@@ -782,11 +782,11 @@ function parseGroqErrorBody(body) {
 
 function makeAudioBlob(audioChunks, mimeType) {
   if (audioChunks.length === 0) {
-    throw new Error("no se capturó audio del micrófono. Revisa permisos de micrófono en Windows.");
+    throw new Error("No audio captured from the microphone. Check microphone permissions in Windows.");
   }
   const audioBlob = new Blob(audioChunks, { type: mimeType || "audio/webm" });
   if (audioBlob.size < 128) {
-    throw new Error("el audio capturado está vacío o es demasiado corto.");
+    throw new Error("The captured audio is empty or too short.");
   }
   return audioBlob;
 }
@@ -988,7 +988,7 @@ function startDeepgramDirectStream(apiKey) {
               "[stt:direct→proxy] fallback fallido:",
               err instanceof Error ? err.message : String(err),
             );
-            broadcast("transcription_error", "Fallo de transcripción. Verifica tu conexión.");
+            broadcast("transcription_error", "Transcription failed. Check your connection.");
           }
         })();
       }
@@ -1158,7 +1158,7 @@ async function transcribeAudio(audioChunks, mimeType) {
 
   if (response.status === 401) {
     const refreshed = await refreshSupabaseSession();
-    if (!refreshed?.access_token) throw new Error("La sesión de Mushu expiró. Inicia sesión otra vez.");
+    if (!refreshed?.access_token) throw new Error("Your Mushu session expired. Please sign in again.");
     response = await fetchWithBackendAuth(`${apiBaseUrl}/api/transcribe`, refreshed.access_token, {
       method: "POST",
       headers: {
@@ -1202,7 +1202,7 @@ async function processRecording() {
       (await transcribeAudio(audioChunks, mimeType).catch((error) => {
         const providerLabel =
           settings.transcription_provider === "deepgram" ? "Deepgram" : "Groq";
-        throw new Error(groqErrorMessage(`Transcripción ${providerLabel}`, error));
+        throw new Error(groqErrorMessage(`${providerLabel} transcription`, error));
       }));
     if (!rawText) {
       broadcast("transcription_done", { text: "", mode: currentMode });
@@ -1276,7 +1276,7 @@ async function processRecording() {
       try {
         transformed = await translateText(rawText, settings.auto_translate_target);
       } catch (error) {
-        const message = groqErrorMessage("Traducción Groq", error);
+        const message = groqErrorMessage("Groq translation", error);
         console.error(message);
         broadcast("groq_error", message);
         transformed = rawText;
@@ -1285,7 +1285,7 @@ async function processRecording() {
       try {
         transformed = await transformText(rawText);
       } catch (error) {
-        const message = groqErrorMessage("Transformación Groq", error);
+        const message = groqErrorMessage("Groq formatting", error);
         console.error(message);
         broadcast("groq_error", message);
         // Si ya hay transcripción, no bloqueamos el flujo: pegamos el texto crudo.
@@ -1555,7 +1555,7 @@ function registerIpc(updateTrayMenu) {
         broadcast("frontend_state_changed", {});
         return getFrontendState();
       case "test_groq":
-        return accountCache ? "Groq listo desde el backend de Mushu." : "Inicia sesión para usar Groq desde backend.";
+        return accountCache ? "Groq ready via the Mushu backend." : "Sign in to use Groq via the backend.";
       case "save_deepgram_api_key": {
         const key = normalizeDeepgramApiKey(args.key);
         if (key) {
@@ -1572,8 +1572,8 @@ function registerIpc(updateTrayMenu) {
           return "DeepGram directo listo (nova-3, multi-idioma, smart_format, numerals, punctuate).";
         }
         return accountCache
-          ? "DeepGram via backend Mushu. Agrega tu API key para conexión directa."
-          : "Inicia sesión o configura tu API key de DeepGram.";
+          ? "DeepGram via the Mushu backend. Add your API key for a direct connection."
+          : "Sign in or configure your DeepGram API key.";
       case "get_history":
         return historyStore;
       case "clear_history":

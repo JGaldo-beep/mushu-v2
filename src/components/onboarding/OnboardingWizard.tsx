@@ -100,10 +100,10 @@ export function OnboardingWizard({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Paso {step + 1} de {STEP_COUNT}
+              Step {step + 1} of {STEP_COUNT}
             </p>
             <h2 id="onboarding-title" className="mt-1 text-lg font-semibold tracking-tight">
-              Bienvenido a Mushu
+              Welcome to Mushu
             </h2>
           </div>
           <Button
@@ -114,7 +114,7 @@ export function OnboardingWizard({
             disabled={busy}
             onClick={() => void finish()}
           >
-            Saltar
+            Skip
           </Button>
         </div>
 
@@ -122,11 +122,13 @@ export function OnboardingWizard({
           {step === 0 && (
             <div className="space-y-3 text-foreground/90">
               <p>
-                Mushu transcribe lo que dictas con un <strong className="text-foreground">atajo global</strong> y
-                puede reescribir el texto según el modo que elijas (correo, nota o voz directa).
+                Mushu transcribes what you dictate with a{" "}
+                <strong className="text-foreground">global shortcut</strong> and can rewrite
+                the text based on the mode you pick (email, note, or raw voice).
               </p>
               <p>
-                Ahora el trial vive en tu cuenta: inicias sesión una vez y Mushu usa tus minutos disponibles sin configuraciones adicionales.
+                Your trial lives in your account now: sign in once and Mushu uses your
+                available minutes without any extra configuration.
               </p>
             </div>
           )}
@@ -134,23 +136,23 @@ export function OnboardingWizard({
           {step === 1 && (
             <div className="space-y-4">
               <p className="text-foreground/90">
-                Tenés dos formas de grabar. Probá la que te resulte más cómoda.
+                There are two ways to record. Try the one that feels most natural.
               </p>
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
-                <p className="text-xs font-medium text-foreground">Dictado</p>
+                <p className="text-xs font-medium text-foreground">Dictation</p>
                 <ShortcutKbd keys={dictationParts} />
                 <p className="text-xs text-muted-foreground">
-                  Tap rápido para arrancar a grabar; otro tap o ESC para enviar lo dictado.
+                  Quick tap to start recording; another tap or ESC to send.
                 </p>
               </div>
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
                 <p className="text-xs font-medium text-foreground">Push-to-talk</p>
                 <ShortcutKbd keys={pttParts} />
                 <p className="text-xs text-muted-foreground">
-                  Mantenelo pulsado mientras hablás; al soltar se envía.
+                  Hold while you speak; release to send.
                 </p>
               </div>
-              <p className="text-xs">Puedes cambiarlos en Ajustes → Atajos de teclado.</p>
+              <p className="text-xs">You can change them in Settings → Shortcuts.</p>
             </div>
           )}
 
@@ -159,16 +161,20 @@ export function OnboardingWizard({
               {signedInEmail ? (
                 <div className="space-y-3">
                   <p>
-                    Ya iniciaste sesión como <strong className="text-foreground">{signedInEmail}</strong>.
+                    You're signed in as{" "}
+                    <strong className="text-foreground">{signedInEmail}</strong>.
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    La primera vez que grabes, Windows puede pedir permiso para usar el micrófono. Aceptá para continuar.
+                    The first time you record, Windows may ask for microphone permission.
+                    Accept it to continue.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <p>
-                    Iniciá sesión para activar tu <strong className="text-foreground">trial de Mushu</strong>. No necesitás configurar nada más.
+                    Sign in to activate your{" "}
+                    <strong className="text-foreground">Mushu trial</strong>. No extra
+                    configuration needed.
                   </p>
                   <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
                     <div className="space-y-2">
@@ -176,7 +182,7 @@ export function OnboardingWizard({
                         type="email"
                         autoComplete="email"
                         spellCheck={false}
-                        placeholder="correo@dominio.com"
+                        placeholder="you@domain.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         disabled={authBusy || busy}
@@ -184,7 +190,7 @@ export function OnboardingWizard({
                       <Input
                         type="password"
                         autoComplete="current-password"
-                        placeholder="Contraseña"
+                        placeholder="Password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={authBusy || busy}
@@ -199,7 +205,7 @@ export function OnboardingWizard({
                       disabled={busy || authBusy || !email.trim() || !password}
                       onClick={() => void handleLogin()}
                     >
-                      {authBusy ? "Entrando..." : "Iniciar sesión"}
+                      {authBusy ? "Signing in…" : "Sign in"}
                     </Button>
                     {authError ? (
                       <p className="text-xs text-destructive" role="alert">
@@ -215,7 +221,7 @@ export function OnboardingWizard({
           {step === 3 && (
             <div className="space-y-4">
               <p className="text-foreground/90">
-                Probemos que todo funciona. Mantené el atajo y decí algo:
+                Let's make sure everything works. Hold the shortcut and say something:
               </p>
               <div className="rounded-lg border border-border bg-muted/30 p-3">
                 <div className="flex items-center justify-between gap-3">
@@ -223,21 +229,26 @@ export function OnboardingWizard({
                   <ShortcutKbd keys={pttParts} size="sm" />
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Sugerencia: decí <strong className="text-foreground">"Hola, ¿cómo estás?"</strong>
+                  Suggestion: say{" "}
+                  <strong className="text-foreground">"Hello, how are you?"</strong>
                 </p>
               </div>
               <div className="min-h-20 rounded-lg border border-border bg-muted/30 p-3">
-                <p className="mb-2 text-xs font-medium text-foreground">Resultado</p>
+                <p className="mb-2 text-xs font-medium text-foreground">Result</p>
                 {testText ? (
                   <p className="text-sm text-foreground/90">
                     <span className="text-emerald-500">✓</span> &ldquo;{testText}&rdquo;
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Esperando tu primer dictado…</p>
+                  <p className="text-xs text-muted-foreground">
+                    Waiting for your first dictation…
+                  </p>
                 )}
               </div>
               {testText ? (
-                <p className="text-xs text-emerald-500">¡Funciona! Continuá cuando quieras.</p>
+                <p className="text-xs text-emerald-500">
+                  It works! Continue when you're ready.
+                </p>
               ) : null}
             </div>
           )}
@@ -247,10 +258,11 @@ export function OnboardingWizard({
               {signedInEmail ? (
                 <>
                   <p>
-                    Trial activado para <strong className="text-foreground">{signedInEmail}</strong>.
+                    Trial active for{" "}
+                    <strong className="text-foreground">{signedInEmail}</strong>.
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Podés revisar tus minutos restantes en la sección Cuenta.
+                    You can check your remaining minutes in the Account section.
                   </p>
                   <Button
                     type="button"
@@ -263,11 +275,13 @@ export function OnboardingWizard({
                       onNavigateSettings("account");
                     }}
                   >
-                    Ir a Cuenta
+                    Go to Account
                   </Button>
                 </>
               ) : (
-                <p>Iniciá sesión cuando quieras desde la barra lateral para activar tu trial.</p>
+                <p>
+                  Sign in any time from the sidebar to activate your trial.
+                </p>
               )}
             </div>
           )}
@@ -281,7 +295,7 @@ export function OnboardingWizard({
             disabled={step === 0 || busy}
             onClick={() => setStep((s) => Math.max(0, s - 1))}
           >
-            Atrás
+            Back
           </Button>
           <div className="flex gap-2">
             {step < STEP_COUNT - 1 ? (
@@ -291,11 +305,11 @@ export function OnboardingWizard({
                 disabled={busy || authBusy}
                 onClick={() => setStep((s) => s + 1)}
               >
-                Siguiente
+                Next
               </Button>
             ) : (
               <Button type="button" size="sm" disabled={busy} onClick={() => void finish()}>
-                Empezar
+                Get started
               </Button>
             )}
           </div>

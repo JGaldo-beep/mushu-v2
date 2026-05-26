@@ -76,7 +76,7 @@ export function ExplainApp() {
           ? p
           : p && typeof p === "object" && "message" in p && typeof (p as { message?: unknown }).message === "string"
             ? (p as { message: string }).message
-            : "Error al explicar.";
+            : "Failed to explain.";
       setError(msg);
     }));
 
@@ -104,12 +104,12 @@ export function ExplainApp() {
       >
         <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
           <h2 id="explain-title" className="text-sm font-medium tracking-tight text-foreground/90">
-            Explicar selección
+            Explain selection
           </h2>
           <button
             type="button"
             className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            aria-label="Cerrar"
+            aria-label="Close"
             onClick={() => void closeExplain()}
           >
             <X className="size-4" />
