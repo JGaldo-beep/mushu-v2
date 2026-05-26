@@ -116,6 +116,19 @@ export function useDictation() {
       scheduleClear(ERROR_AUTO_CLEAR_MS);
     });
 
+    const unlistenCancelled = listen("dictation_cancelled", () => {
+      if (clearTimerRef.current) {
+        window.clearTimeout(clearTimerRef.current);
+        clearTimerRef.current = null;
+      }
+      setState((s) => ({
+        ...s,
+        status: "idle",
+        resultText: null,
+        errorMessage: null,
+      }));
+    });
+
     const unlistenGroq = listen("groq_error", (event) => {
       const msg = String(event.payload ?? "Error al transcribir. Intenta de nuevo.");
       setState((s) => ({ ...s, status: "error", errorMessage: msg }));
@@ -131,6 +144,7 @@ export function useDictation() {
       unlistenModeSwitch.then((f) => f());
       unlistenError.then((f) => f());
       unlistenGroq.then((f) => f());
+      unlistenCancelled.then((f) => f());
       if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
     };
   }, [scheduleClear]);

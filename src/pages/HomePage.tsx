@@ -462,8 +462,16 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
           )}
         </div>
 
-        {/* Push-to-talk hero — bare, type-driven, no card backdrop */}
-        <div className="mt-10 flex flex-col items-center gap-7 px-4 py-12">
+        {/* Push-to-talk hero — wrapped in a card so it doesn't drown in whitespace */}
+        <div
+          className="mt-5 flex flex-col items-center gap-7 px-4 py-10"
+          style={{
+            border: "0.5px solid var(--border)",
+            borderRadius: "var(--radius)",
+            background: "var(--card)",
+            minHeight: "260px",
+          }}
+        >
           <AnimatePresence mode="wait">
             {status === "idle" && (
               <motion.div
