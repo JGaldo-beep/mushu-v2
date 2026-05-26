@@ -3,83 +3,48 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Overlay tokens — mirror the canonical Mushu palette from index.css.
- * The overlay window currently follows the system color scheme
- * (prefers-color-scheme). TODO: wire it to the user's settings.theme
- * via IPC so it stays in sync with the main window when the user
- * forces light or dark.
+/* The overlay window is ALWAYS dark — independent of the main app's
+ * light/dark theme. A floating pill on top of arbitrary content reads
+ * better as a single dark surface with light text and a white wave.
  */
 
 :root {
+  color-scheme: dark;
+
   --radius: 1.25rem;
 
-  --background: #FEFCF5;
-  --foreground: #3C3A39;
+  --background: #0F0E0D;
+  --foreground: #F0EDE8;
 
-  --card: #FFFFFF;
-  --card-foreground: #3C3A39;
+  --card: #1A1917;
+  --card-foreground: #F0EDE8;
 
-  --popover: #FFFFFF;
-  --popover-foreground: #3C3A39;
+  --popover: #1A1917;
+  --popover-foreground: #F0EDE8;
 
   --primary: #81B09A;
-  --primary-foreground: #FEFCF5;
+  --primary-foreground: #0F0E0D;
 
-  --secondary: #EDE6DB;
-  --secondary-foreground: #3C3A39;
+  --secondary: #2A2724;
+  --secondary-foreground: #F0EDE8;
 
-  --muted: #F5F0E8;
-  --muted-foreground: #8A8278;
+  --muted: #1F1E1C;
+  --muted-foreground: #B5AFA7;
 
-  --accent: #C6DACC;
-  --accent-foreground: #3C3A39;
+  --accent: #2A3830;
+  --accent-foreground: #C6DACC;
 
-  --destructive: #C9554A;
-  --destructive-foreground: #FEFCF5;
+  --destructive: #E07A6E;
+  --destructive-foreground: #0F0E0D;
 
-  --border: #E8E0D4;
-  --input: #EDE6DB;
+  --border: #2C2A27;
+  --input: #2A2724;
   --ring: #81B09A;
 
-  --overlay-pill-bg: rgba(254, 252, 245, 0.92);
-  --overlay-pill-shadow: 0 16px 42px -14px rgba(60, 58, 57, 0.28);
-  --overlay-pill-border: rgba(60, 58, 57, 0.10);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0F0E0D;
-    --foreground: #F0EDE8;
-
-    --card: #1A1917;
-    --card-foreground: #F0EDE8;
-
-    --popover: #1A1917;
-    --popover-foreground: #F0EDE8;
-
-    --primary: #81B09A;
-    --primary-foreground: #0F0E0D;
-
-    --secondary: #2A2724;
-    --secondary-foreground: #F0EDE8;
-
-    --muted: #1F1E1C;
-    --muted-foreground: #7A7570;
-
-    --accent: #2A3830;
-    --accent-foreground: #C6DACC;
-
-    --destructive: #E07A6E;
-    --destructive-foreground: #0F0E0D;
-
-    --border: #2C2A27;
-    --input: #2A2724;
-    --ring: #81B09A;
-
-    --overlay-pill-bg: rgba(26, 25, 23, 0.92);
-    --overlay-pill-shadow: 0 16px 42px -14px rgba(0, 0, 0, 0.72);
-    --overlay-pill-border: rgba(240, 237, 232, 0.12);
-  }
+  --overlay-pill-bg: rgba(15, 14, 13, 0.94);
+  --overlay-pill-shadow: 0 16px 42px -14px rgba(0, 0, 0, 0.72);
+  --overlay-pill-border: rgba(240, 237, 232, 0.12);
+  --overlay-wave-color: #FFFFFF;
 }
 
 @theme inline {
@@ -200,12 +165,12 @@
 .overlay-route-dict {
   box-shadow:
     var(--overlay-pill-shadow),
-    inset 0 1px 0 color-mix(in oklab, var(--foreground) 8%, transparent),
-    0 0 0 1px color-mix(in oklab, var(--primary) 30%, transparent);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .overlay-pause-hint {
-  color: color-mix(in oklab, var(--foreground) 60%, transparent);
+  color: rgba(255, 255, 255, 0.62);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -233,7 +198,7 @@
 }
 
 .overlay-live-transcript {
-  color: color-mix(in oklab, var(--foreground) 78%, transparent);
+  color: rgba(255, 255, 255, 0.78);
   display: block;
   max-width: 210px;
   overflow: hidden;
@@ -261,23 +226,21 @@
 }
 
 .overlay-mode-chip-label {
-  color: var(--foreground);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 /* Glass button — mirrors design-tokens.css for overlay-local consumers */
 .glass-btn {
-  background: color-mix(in oklab, var(--background) 60%, transparent);
-  border: 0.5px solid var(--border);
-  color: var(--muted-foreground);
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
   transition:
     background 0.15s,
     border-color 0.15s,
     color 0.15s;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 .glass-btn:hover {
-  background: color-mix(in oklab, var(--primary) 14%, transparent);
-  border-color: color-mix(in oklab, var(--primary) 40%, transparent);
-  color: var(--primary);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
 }

@@ -139,7 +139,7 @@ export function Overlay() {
                               <Pin size={12} strokeWidth={2.5} />
                             </motion.span>
                           )}
-                          <WaveBars level={audioLevel} color={mode.color} idle={waveIdle} />
+                          <WaveBars level={audioLevel} color="#FFFFFF" idle={waveIdle} />
                         </>
                       )}
                     </div>
