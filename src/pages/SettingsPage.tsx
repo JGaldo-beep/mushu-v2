@@ -7,7 +7,6 @@ import {
   Info,
   Keyboard,
   LifeBuoy,
-  MessageCircle,
   Mic,
   Plus,
   RefreshCw,
@@ -322,35 +321,6 @@ export function SettingsPage() {
       toast.error(String(e));
     } finally {
       setDgKeySaving(false);
-    }
-  };
-
-  const [anthropicKeyInput, setAnthropicKeyInput] = useState("");
-  const [anthropicKeyVisible, setAnthropicKeyVisible] = useState(false);
-  const [anthropicKeySaving, setAnthropicKeySaving] = useState(false);
-
-  const onSaveAnthropicKey = async () => {
-    setAnthropicKeySaving(true);
-    try {
-      await tauri.saveAnthropicApiKey(anthropicKeyInput.trim());
-      setAnthropicKeyInput("");
-      toast.success("API key de Anthropic guardada");
-    } catch (e) {
-      toast.error(String(e));
-    } finally {
-      setAnthropicKeySaving(false);
-    }
-  };
-
-  const onDeleteAnthropicKey = async () => {
-    setAnthropicKeySaving(true);
-    try {
-      await tauri.saveAnthropicApiKey("");
-      toast.success("API key de Anthropic eliminada");
-    } catch (e) {
-      toast.error(String(e));
-    } finally {
-      setAnthropicKeySaving(false);
     }
   };
 
@@ -737,139 +707,6 @@ export function SettingsPage() {
                 Agregar par
               </button>
             </div>
-          </GlassCard>
-
-          {/* WhatsApp Agent */}
-          <GlassCard className="overflow-hidden">
-            <SectionHeader
-              title="Agente WhatsApp"
-              icon={MessageCircle}
-              description="Dicta comandos de voz para enviar mensajes de WhatsApp"
-            />
-            <SettingRow
-              label="Activar agente"
-              description='Detecta frases como "dile a Juan…" y envía mensajes por WhatsApp automáticamente.'
-              control={
-                <GlassToggle
-                  value={draft?.whatsapp_enabled ?? false}
-                  onChange={(v) => setField("whatsapp_enabled", v)}
-                />
-              }
-            />
-            {draft?.whatsapp_enabled && (
-              <SettingRow
-                label="Estado de WhatsApp"
-                description={
-                  draft?.whatsapp_status === "ready"
-                    ? "Sesión activa. Puedes enviar mensajes con tu voz."
-                    : draft?.whatsapp_status === "qr"
-                      ? "Escanea el QR que aparece en pantalla con tu teléfono."
-                      : "Conectando… Aparecerá un QR para escanear."
-                }
-                control={
-                  <span
-                    className="inline-flex items-center rounded-full px-2.5 py-1"
-                    style={{
-                      fontFamily: "'Space Mono', monospace",
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      background:
-                        draft?.whatsapp_status === "ready"
-                          ? "rgba(22,163,74,0.10)"
-                          : draft?.whatsapp_status === "qr"
-                            ? "rgba(234,179,8,0.10)"
-                            : "rgba(251,146,60,0.10)",
-                      border:
-                        draft?.whatsapp_status === "ready"
-                          ? "0.5px solid rgba(22,163,74,0.30)"
-                          : draft?.whatsapp_status === "qr"
-                            ? "0.5px solid rgba(234,179,8,0.30)"
-                            : "0.5px solid rgba(251,146,60,0.30)",
-                      color:
-                        draft?.whatsapp_status === "ready"
-                          ? "var(--delta-green)"
-                          : draft?.whatsapp_status === "qr"
-                            ? "rgb(234,179,8)"
-                            : "rgb(251,146,60)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                    }}
-                  >
-                    {draft?.whatsapp_status === "ready"
-                      ? "Conectado"
-                      : draft?.whatsapp_status === "qr"
-                        ? "Esperando QR"
-                        : "Desconectado"}
-                  </span>
-                }
-              />
-            )}
-            <SettingRow
-              label="Anthropic API Key"
-              description={
-                draft?.has_anthropic_key
-                  ? "Clave guardada. Ingresa una nueva para actualizarla."
-                  : "Necesaria para detectar comandos de voz. Obtén tu clave en console.anthropic.com."
-              }
-              isLast
-              control={
-                <div className="flex items-center gap-2">
-                  {draft?.has_anthropic_key ? (
-                    <button
-                      type="button"
-                      className="glass-btn rounded-lg px-3 py-1.5"
-                      onClick={onDeleteAnthropicKey}
-                      disabled={anthropicKeySaving}
-                      style={{
-                        fontFamily: "'Geist Variable', sans-serif",
-                        fontSize: "12px",
-                        fontWeight: 500,
-                        color: "rgb(251,146,60)",
-                      }}
-                    >
-                      Eliminar
-                    </button>
-                  ) : null}
-                  <div className="relative flex items-center">
-                    <input
-                      type={anthropicKeyVisible ? "text" : "password"}
-                      value={anthropicKeyInput}
-                      onChange={(e) => setAnthropicKeyInput(e.target.value)}
-                      placeholder="sk-ant-..."
-                      className="glass-input rounded-lg pr-8"
-                      style={{
-                        fontFamily: "'Space Mono', monospace",
-                        fontSize: "11px",
-                        padding: "6px 28px 6px 10px",
-                        width: "160px",
-                        outline: "none",
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setAnthropicKeyVisible((v) => !v)}
-                      className="absolute right-2 text-(--text-muted) hover:text-(--text-secondary)"
-                      tabIndex={-1}
-                    >
-                      {anthropicKeyVisible ? <EyeOff size={13} /> : <Eye size={13} />}
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    className="glass-btn rounded-lg px-3 py-1.5"
-                    onClick={onSaveAnthropicKey}
-                    disabled={anthropicKeySaving || !anthropicKeyInput.trim()}
-                    style={{
-                      fontFamily: "'Geist Variable', sans-serif",
-                      fontSize: "12px",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {anthropicKeySaving ? "Guardando…" : "Guardar"}
-                  </button>
-                </div>
-              }
-            />
           </GlassCard>
 
           {/* Shortcuts */}

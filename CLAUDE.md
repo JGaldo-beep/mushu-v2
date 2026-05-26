@@ -24,9 +24,9 @@ Mushu is an Electron app with three BrowserWindow instances:
 - **overlay window** (`overlay.html`) — Always-on-top floating bar showing waveform + live transcript
 - **explain window** (`explain.html`) — Popup for the "Explain" feature
 
-All core application logic lives in **`main.js`** (the Electron main process, ~1800 lines). Renderer processes are React 19 apps built with Vite. There is no shared state library — React state is always derived from `FrontendState` returned by the main process.
+All core application logic lives in **`main.js`** (the Electron main process). Renderer processes are React 19 apps built with Vite. There is no shared state library — React state is always derived from `FrontendState` returned by the main process.
 
-`main.js` runs as an ES module (`"type": "module"` in `package.json`). CommonJS-only packages (e.g. `whatsapp-web.js`, `qrcode`) must be loaded via the `_require = createRequire(import.meta.url)` helper at the top of the file — dynamic `import()` on a CJS package strips named exports and yields `LocalAuth is not a constructor`-style failures.
+`main.js` runs as an ES module (`"type": "module"` in `package.json`).
 
 ### IPC bridge
 `preload.cjs` exposes a single `window.mushu` object with three methods:
@@ -36,7 +36,7 @@ All core application logic lives in **`main.js`** (the Electron main process, ~1
 
 `src/lib/tauri.ts` wraps all `invoke` calls with typed signatures. `src/lib/events.ts` wraps `window.mushu.on` for typed event subscriptions. Add new IPC commands by: (1) adding a `case` in the `ipcMain.handle("mushu:invoke", ...)` switch in main.js, and (2) adding a typed wrapper in `src/lib/tauri.ts`.
 
-**Sender trust check:** every `mushu:invoke` rejects calls whose `event.senderFrame.url` doesn't match the dev server origin (in dev) or `file://` (in prod). When adding a new BrowserWindow, load it from one of the existing HTML entry points (or the dev server) — arbitrary URLs will be refused. See [main.js:1678](main.js#L1678).
+**Sender trust check:** every `mushu:invoke` rejects calls whose `event.senderFrame.url` doesn't match the dev server origin (in dev) or `file://` (in prod). When adding a new BrowserWindow, load it from one of the existing HTML entry points (or the dev server) — arbitrary URLs will be refused.
 
 ### Audio pipeline
 1. `useCaptureBridge` (overlay renderer) listens for `recording_started` → calls `getUserMedia` → creates a `MediaRecorder` (WebM/Opus, 250ms chunks) and an `AudioWorklet` (linear16, 16kHz) in parallel
@@ -46,27 +46,40 @@ All core application logic lives in **`main.js`** (the Electron main process, ~1
 ### Transcription flow
 Two parallel paths are attempted when recording starts:
 - **DeepGram direct** (`startDeepgramDirectStream`) — if `secrets.deepgram_api_key` exists, opens `wss://api.deepgram.com/v1/listen` with `nova-3`, `language=multi`, `smart_format`, `punctuate`, `numerals`, `vad_events`, `endpointing`. Token passed as `?token=` query param.
-- **Backend proxy** (`startDeepgramStream`) — WebSocket to Railway/Mushu backend if no direct key
+- **Backend proxy** (`startDeepgramStream`) — WebSocket to a separate stream service if no direct key (currently a Railway deployment configured via `MUSHU_STREAM_URL`).
 
-When recording stops, `finishDeepgramStream()` waits up to 400ms for a final result, then falls back to the interim transcript. If neither stream produced output, falls back to `transcribeAudio()` (REST POST to backend).
+When recording stops, `finishDeepgramStream()` waits up to 400ms for a final result, then falls back to the interim transcript. If neither stream produced output, falls back to `transcribeAudio()` (REST POST to `https://mushu.space/api/transcribe`).
 
 ### Settings and secrets
 Stored as JSON files in `%APPDATA%/MushuV2Electron/`:
 - `settings.json` — all non-sensitive settings (hotkeys, theme, provider, etc.)
-- `secrets.json` — API keys (`deepgram_api_key`, `groq_api_key`, `anthropic_api_key`)
+- `secrets.json` — API keys (`deepgram_api_key`, `groq_api_key`)
 - `history.json` — last 200 transcription entries
 
 `DEFAULT_SETTINGS` in main.js is the canonical default; `FrontendState` in `src/lib/types.ts` is the TypeScript shape returned to renderers. When adding a new setting: add to `DEFAULT_SETTINGS`, add to `FrontendState`, add to `SaveSettingsInput`, handle in the `save_settings` IPC case **and** add the field to the explicit payload built inside `src/hooks/useSettings.ts` `save()` — that hook hand-picks fields rather than spreading `draft`, so a missing entry silently drops the value on save. `cycle_mode_hotkey` is the standing example of this gap: it lives in `DEFAULT_SETTINGS` and `FrontendState` but is missing from both `SaveSettingsInput` and the hook payload, so it currently cannot be edited from the UI.
 
 ### Auth and Mushu backend
-Most cloud features (Groq formatting, the selection agent, the streaming-STT proxy, entitlements) go through a hosted "Mushu backend" at `settings.api_base_url`, authenticated with Supabase.
+Most cloud features (Groq formatting, the selection agent, the streaming-STT proxy, entitlements) go through the hosted Mushu backend at `https://mushu.space` (`settings.api_base_url`), authenticated with Supabase.
 
-- **Login flow:** the user authenticates in their browser; the backend redirects to `mushu://auth?session=<base64url-JSON>`. Electron's single-instance lock (`gotSingleInstanceLock`) captures the URL out of `argv`, and `handleMushuDeepLink()` ([main.js:477](main.js#L477)) decodes it into `secrets.mushu_session` and mirrors it as the runtime `accountCache`. Don't add a second `requestSingleInstanceLock` caller or the protocol breaks.
-- **Backend calls:** always use `callMushuJson()` / `fetchWithBackendAuth()` ([main.js:683-738](main.js#L683-L738)). They auto-refresh the Supabase access token via `getValidSession()` on 401. Direct `fetch()` against the backend will silently break when tokens expire.
-- **Stream URL derivation:** `resolveMushuStreamUrl()` ([main.js:454](main.js#L454)) maps `api_base_url` to the WebSocket endpoint — `localhost:3000` becomes `ws://localhost:3001`, anything else swaps `http→ws` and sets path `/api/mushu/stream`. Override with the `MUSHU_STREAM_URL` env var.
+Endpoints called by the client:
+- `GET /api/me` — account + entitlement refresh
+- `POST /api/transcribe` — audio-to-text fallback (REST)
+- `POST /api/translate` — text translation
+- `POST /api/agent` — selection agent and explain mode
+- `GET /api/releases/latest` — future auto-update (not yet wired; see TODO in `main.js`)
+
+The WebSocket stream URL is a separate service. By default `resolveMushuStreamUrl()` derives it from `api_base_url` by swapping `http→ws` and appending `/api/mushu/stream`; in practice this is overridden by the `MUSHU_STREAM_URL` env var that points at the Railway deployment.
+
+- **Login flow:** the user authenticates in their browser; the backend redirects to `mushu://auth?session=<base64url-JSON>`. Electron's single-instance lock (`gotSingleInstanceLock`) captures the URL out of `argv`, and `handleMushuDeepLink()` decodes it into `secrets.mushu_session` and mirrors it as the runtime `accountCache`. Don't add a second `requestSingleInstanceLock` caller or the protocol breaks.
+- **Backend calls:** always use `callMushuJson()` / `fetchWithBackendAuth()`. They auto-refresh the Supabase access token via `getValidSession()` on 401. Direct `fetch()` against the backend will silently break when tokens expire.
 
 ### .env loading
-`loadDotEnvFile()` ([main.js:109](main.js#L109)) reads a `.env` file adjacent to `main.js` at startup and fills any `VITE_*` keys not already in `process.env`. The settings UI fields `supabase_url`, `supabase_anon_key`, and `api_base_url` fall back to `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_API_BASE_URL` respectively when empty. The `.env` file is packaged into the installer via `build.files` in `package.json` — treat it as the source of defaults for distributed builds, not a secret store.
+`loadDotEnvFile()` reads a `.env` file adjacent to `main.js` at startup and fills any `VITE_*` keys not already in `process.env`. The settings UI fields `supabase_url`, `supabase_anon_key`, and `api_base_url` fall back to `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_API_BASE_URL` respectively when empty. The `.env` file is packaged into the installer via `build.files` in `package.json` — treat it as the source of defaults for distributed builds, not a secret store.
+
+### Visual identity
+The canonical palette and brand assets live in the sibling `mushu-landing` repo. Tokens defined in `src/index.css` (`:root` light + `.dark` block) and mirrored in `src/overlay/overlay.css`. Logos: `public/mini-logo.svg` (badge / icon), `public/logo.svg` (wordmark). `scripts/generate-icon.cjs` regenerates `build/icon.ico` and the PNG icon set from `public/mini-logo.svg`.
+
+Component-level utilities in `src/styles/design-tokens.css` consume the canonical tokens via `var(--primary)` etc. and via backward-compat aliases (`--text-primary`, `--glass-bg`, …) so legacy inline-style consumers keep working. Long-term those should migrate to canonical token names directly.
 
 ### Hotkey system
 Two layers:
@@ -80,13 +93,13 @@ Three modes: `DEFAULT` (raw dictation), `EMAIL` (AI-formatted as email), `NOTE` 
 
 ### Agent intercepts in `processRecording`
 After the transcript is finalized, `processRecording()` runs a chain of intercepts before falling through to normal text injection:
-1. **WhatsApp agent** (gated on `settings.whatsapp_enabled` + `whatsappStatus === "ready"`) — if the transcript starts with a trigger phrase (`dile`, `manda`, `envía`, `tell`, `send`, …), it calls Claude Haiku for intent parsing and dispatches `executeWhatsappSend()` if the action is `send_whatsapp`. Contact matching is word-boundary aware and diacritic-insensitive (NFD + `\p{Diacritic}`).
-2. **Selection agent** (`agentSelection && accountCache`) — calls the Mushu backend's `/api/mushu/agent` with the captured selection as context.
-3. Otherwise → translate/format → clipboard → paste.
+1. **Selection agent** (`agentSelection && accountCache`) — calls the Mushu backend's `/api/agent` with the captured selection as context.
+2. Otherwise → translate/format → clipboard → paste.
 
 **Invariant:** every early-return branch in `processRecording()` must still `broadcast("transcription_done", { text, mode: currentMode })` (use `try/finally`). The overlay listens for this event to reset from the "processing" state — skipping it leaves the pill stuck and visually breaks the next recording even though the audio pipeline still works.
 
-Claude Haiku responses frequently arrive wrapped in ```json fences despite system-prompt instructions; `detectWhatsappIntent` extracts the JSON object with `/\{[\s\S]*\}/` rather than `JSON.parse(raw)` directly.
+### WhatsApp agent (moved to `feat/whatsapp`)
+The voice-driven WhatsApp send feature lives on the `feat/whatsapp` branch. It includes `whatsapp-web.js` + puppeteer for the WhatsApp Web client, Anthropic Haiku for intent parsing, and a QR-pairing flow. Checkout `feat/whatsapp` to resume work on it. Do not re-add WhatsApp code to `main` without coordinating with the branch.
 
 ### Publishing a release
 Set `GH_TOKEN` env var (GitHub classic token with `repo` scope), then run `npm run release:win`. electron-builder creates a GitHub Release tagged `v{version}` with `Mushu-Setup.exe` as the asset. Bump `version` in `package.json` before releasing.

@@ -264,7 +264,7 @@
   color: var(--foreground);
 }
 
-/* Glass button — used by WhatsApp picker, mirrors design-tokens.css */
+/* Glass button — mirrors design-tokens.css for overlay-local consumers */
 .glass-btn {
   background: color-mix(in oklab, var(--background) 60%, transparent);
   border: 0.5px solid var(--border);

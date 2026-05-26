@@ -83,8 +83,6 @@ export type OverlaySurface =
   | "reply"
   | "idle";
 
-export type WhatsappPickerMatch = { id: string; name: string };
-
 export function useOverlayState() {
   const [surface, setSurface] = useState<OverlaySurface>("hidden");
   const [mode, setMode] = useState<ModeInfo>(DEFAULT_MODE);
@@ -96,18 +94,12 @@ export function useOverlayState() {
   const [isHandsOff, setIsHandsOff] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState("");
-  const [whatsappMessage, setWhatsappMessage] = useState<string | null>(null);
-  const [whatsappPicker, setWhatsappPicker] = useState<{
-    matches: WhatsappPickerMatch[];
-    message: string;
-  } | null>(null);
 
   const soundEnabledRef = useRef(true);
   const soundVolumeRef = useRef(0.22);
   const thinkTimerRef = useRef<number | null>(null);
   const mushuHideTimerRef = useRef<number | null>(null);
   const transcriptionExitTimerRef = useRef<number | null>(null);
-  const whatsappMessageTimerRef = useRef<number | null>(null);
 
   const bumpModePop = useCallback(() => {
     setModePopToken((n) => n + 1);
@@ -302,31 +294,10 @@ export function useOverlayState() {
       }),
     );
 
-    unsubs.push(
-      listen("whatsapp_result", (event) => {
-        const p = event.payload as { success: boolean; contact?: string; error?: string };
-        if (whatsappMessageTimerRef.current) window.clearTimeout(whatsappMessageTimerRef.current);
-        const msg = p.success ? `Enviado a ${p.contact ?? ""}` : (p.error ?? "Error al enviar");
-        setWhatsappMessage(msg);
-        whatsappMessageTimerRef.current = window.setTimeout(() => {
-          whatsappMessageTimerRef.current = null;
-          setWhatsappMessage(null);
-        }, 3000);
-      }),
-    );
-
-    unsubs.push(
-      listen("whatsapp_picker", (event) => {
-        const p = event.payload as { matches: WhatsappPickerMatch[]; message: string };
-        setWhatsappPicker({ matches: p.matches, message: p.message });
-      }),
-    );
-
     return () => {
       cancelThinkPhase();
       cancelMushuHide();
       cancelTranscriptionExit();
-      if (whatsappMessageTimerRef.current) window.clearTimeout(whatsappMessageTimerRef.current);
       for (const u of unsubs) void u.then((f) => f());
     };
   }, [
@@ -357,8 +328,5 @@ export function useOverlayState() {
     isHandsOff,
     isPaused,
     liveTranscript,
-    whatsappMessage,
-    whatsappPicker,
-    clearWhatsappPicker: () => setWhatsappPicker(null),
   };
 }

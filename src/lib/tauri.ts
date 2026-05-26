@@ -23,10 +23,4 @@ export const tauri = {
   copyToClipboard: (text: string) => window.mushu.invoke<void>("copy_to_clipboard", { text }),
   openExternalUrl: (url: string) => window.mushu.invoke<void>("open_external_url", { url }),
   setMode: (mode: ModeName) => window.mushu.invoke<void>("set_mode", { mode }),
-  getWhatsappStatus: () =>
-    window.mushu.invoke<{ status: string; qr?: string }>("get_whatsapp_status"),
-  sendWhatsappMessage: (contact: string, message: string) =>
-    window.mushu.invoke<{ ok: boolean }>("send_whatsapp_message", { contact, message }),
-  saveAnthropicApiKey: (key: string) =>
-    window.mushu.invoke<void>("save_anthropic_api_key", { key }),
 };

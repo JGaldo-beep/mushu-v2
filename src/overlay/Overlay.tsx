@@ -7,7 +7,6 @@ import { WaveBars } from "@/overlay/components/WaveBars";
 import { useAudioLevel } from "@/overlay/useAudioLevel";
 import { useCaptureBridge } from "@/overlay/useCaptureBridge";
 import { useOverlayState } from "@/overlay/useOverlayState";
-import { tauri } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 
 const ease = [0.33, 1, 0.68, 1] as const;
@@ -29,9 +28,6 @@ export function Overlay() {
     isHandsOff,
     isPaused,
     liveTranscript,
-    whatsappMessage,
-    whatsappPicker,
-    clearWhatsappPicker,
   } = useOverlayState();
 
   const audioLevel = useAudioLevel(audioLevelActive);
@@ -155,51 +151,6 @@ export function Overlay() {
         )}
       </AnimatePresence>
 
-      {/* WhatsApp status notification */}
-      <AnimatePresence mode="wait">
-        {whatsappMessage && !whatsappPicker && (
-          <motion.div
-            key="wa-message"
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={transition}
-            className="overlay-pill-surface flex items-center gap-1.5 px-3 py-1"
-            style={{ fontSize: "11px", fontFamily: "'Geist Variable', sans-serif" }}
-          >
-            <span style={{ color: "#25D366" }}>●</span>
-            <span className="text-foreground">{whatsappMessage}</span>
-          </motion.div>
-        )}
-        {whatsappPicker && (
-          <motion.div
-            key="wa-picker"
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={transition}
-            className="overlay-pill-surface flex items-center gap-1.5 px-2.5 py-1"
-            style={{ fontSize: "11px", fontFamily: "'Geist Variable', sans-serif" }}
-          >
-            <span style={{ color: "#25D366", flexShrink: 0 }}>●</span>
-            <span className="text-foreground shrink-0" style={{ opacity: 0.6 }}>¿Quién?</span>
-            {whatsappPicker.matches.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                className="glass-btn rounded-md px-2 py-0.5"
-                style={{ fontSize: "11px", fontFamily: "'Geist Variable', sans-serif" }}
-                onClick={() => {
-                  void tauri.sendWhatsappMessage(m.id, whatsappPicker.message);
-                  clearWhatsappPicker();
-                }}
-              >
-                {m.name}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

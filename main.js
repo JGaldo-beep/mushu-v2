@@ -18,8 +18,6 @@ import { execFile } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { uIOhook, UiohookKey } from "uiohook-napi";
 import WebSocket from "ws";
-import { createRequire } from "node:module";
-const _require = createRequire(import.meta.url);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -61,7 +59,6 @@ const DEFAULT_SETTINGS = {
   auto_translate_target: "en",
   deepgram_replacements: [],
   spoken_language: "auto",
-  whatsapp_enabled: false,
 };
 
 let mainWindow = null;
@@ -101,9 +98,6 @@ let deepgramStreamSeconds = 0;
 let accountCache = null;
 let pendingDeepLinkUrl = null;
 let isQuitting = false;
-let whatsappClient = null;
-let whatsappStatus = "disconnected";
-let whatsappQr = null;
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 function loadDotEnvFile() {
@@ -139,8 +133,6 @@ function getFrontendState() {
     has_groq_key: Boolean(accountCache),
     has_deepgram_key: Boolean(deepgramApiKey || accountCache),
     has_deepgram_direct_key: Boolean(deepgramApiKey),
-    has_anthropic_key: Boolean(secrets.anthropic_api_key),
-    whatsapp_status: whatsappStatus,
     // El renderer enumera los micros reales via navigator.mediaDevices.enumerateDevices().
     microphones: [],
     account: accountCache,
@@ -151,149 +143,6 @@ function getFrontendState() {
 function broadcast(channel, payload) {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(channel, payload);
-  }
-}
-
-// ─── WhatsApp agent ───────────────────────────────────────────────────────────
-
-const WHATSAPP_TRIGGERS = ["dile", "manda", "envía", "envia", "tell", "send", "message", "mensaje"];
-
-async function initWhatsapp() {
-  if (whatsappClient) return;
-  const { Client, LocalAuth } = _require("whatsapp-web.js");
-  const QRCode = _require("qrcode");
-  const sessionPath = path.join(app.getPath("userData"), "whatsapp-session");
-  const headless = process.env.MUSHU_WA_VISIBLE === "1" ? false : true;
-  console.info("[wa] initWhatsapp headless=", headless, "sessionPath=", sessionPath);
-  whatsappClient = new Client({
-    authStrategy: new LocalAuth({ dataPath: sessionPath }),
-    puppeteer: { headless, args: ["--no-sandbox", "--disable-setuid-sandbox"] },
-  });
-  whatsappClient.on("qr", async (qr) => {
-    whatsappQr = await QRCode.toDataURL(qr);
-    whatsappStatus = "qr";
-    broadcast("whatsapp_status_changed", { status: "qr", qr: whatsappQr });
-    broadcast("frontend_state_changed", {});
-  });
-  whatsappClient.on("ready", () => {
-    console.info("[wa] client ready");
-    whatsappStatus = "ready";
-    whatsappQr = null;
-    broadcast("whatsapp_status_changed", { status: "ready" });
-    broadcast("frontend_state_changed", {});
-  });
-  whatsappClient.on("disconnected", () => {
-    whatsappStatus = "disconnected";
-    whatsappClient = null;
-    broadcast("whatsapp_status_changed", { status: "disconnected" });
-    broadcast("frontend_state_changed", {});
-  });
-  whatsappClient.initialize();
-}
-
-async function destroyWhatsapp() {
-  if (whatsappClient) {
-    try { await whatsappClient.destroy(); } catch {}
-    whatsappClient = null;
-  }
-  whatsappStatus = "disconnected";
-  whatsappQr = null;
-  broadcast("whatsapp_status_changed", { status: "disconnected" });
-  broadcast("frontend_state_changed", {});
-}
-
-async function detectWhatsappIntent(transcript) {
-  const lower = transcript.toLowerCase().trim();
-  console.info("[wa:intent] transcript:", JSON.stringify(transcript));
-  if (!WHATSAPP_TRIGGERS.some((t) => lower.startsWith(t))) {
-    console.info("[wa:intent] no trigger phrase match");
-    return null;
-  }
-  const apiKey = secrets.anthropic_api_key;
-  if (!apiKey) {
-    console.info("[wa:intent] no anthropic_api_key in secrets");
-    return null;
-  }
-  console.info("[wa:intent] calling haiku...");
-  const AnthropicSdk = _require("@anthropic-ai/sdk");
-  const Anthropic = AnthropicSdk.default ?? AnthropicSdk;
-  const client = new Anthropic({ apiKey });
-  const res = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 200,
-    system: `You are an intent parser. Given a voice command, return ONLY raw JSON — no markdown, no code fences, no prose, no explanation.
-If the user wants to send a WhatsApp message return:
-{"action":"send_whatsapp","contact":"<name>","message":"<message to send>"}
-If it is not a WhatsApp command return:
-{"action":"none"}`,
-    messages: [{ role: "user", content: transcript }],
-  });
-  const raw = res.content[0].text;
-  console.info("[wa:intent] haiku response:", raw);
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try { return JSON.parse(match[0]); } catch { return null; }
-}
-
-async function executeWhatsappSend(contact, message) {
-  console.info("[wa:send] start contact=", JSON.stringify(contact), "message=", JSON.stringify(message));
-  if (!whatsappClient) {
-    console.warn("[wa:send] no whatsappClient");
-    broadcast("whatsapp_result", { success: false, error: "WhatsApp no está conectado" });
-    return;
-  }
-  try {
-    console.info("[wa:send] fetching chats...");
-    const chats = await whatsappClient.getChats();
-    console.info("[wa:send] got", chats.length, "chats");
-    const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").trim();
-    const tokenize = (s) => norm(s).split(/[\s\-_.,()/]+/).filter(Boolean);
-    const needle = norm(contact);
-    const needleTokens = tokenize(contact);
-    const scored = chats
-      .map((c) => {
-        const name = norm(c.name);
-        if (!name) return null;
-        const nameTokens = tokenize(c.name);
-        let score = 0;
-        if (name === needle) score = 100;
-        else if (nameTokens.includes(needle)) score = 90;
-        else if (nameTokens.some((t) => t.startsWith(needle))) score = 80;
-        else if (needleTokens.length > 1) {
-          const hits = needleTokens.filter((nt) =>
-            nameTokens.some((t) => t === nt || t.startsWith(nt)),
-          ).length;
-          if (hits === needleTokens.length) score = 70;
-          else if (hits > 0) score = 30 + hits * 10;
-        }
-        return score ? { chat: c, name: c.name, score } : null;
-      })
-      .filter(Boolean)
-      .sort((a, b) => b.score - a.score);
-    const topScore = scored[0]?.score ?? 0;
-    const matches = scored.filter((s) => s.score === topScore).map((s) => s.chat);
-    console.info("[wa:send] matches:", matches.map((c) => c.name), "topScore:", topScore);
-    if (matches.length === 0) {
-      const sample = chats.slice(0, 10).map((c) => c.name).filter(Boolean);
-      console.warn("[wa:send] no match. sample chat names:", sample);
-      broadcast("whatsapp_result", { success: false, error: `Contacto "${contact}" no encontrado` });
-      return;
-    }
-    if (matches.length === 1) {
-      console.info("[wa:send] sending to", matches[0].name, "(id:", matches[0].id._serialized, ")");
-      await matches[0].sendMessage(message);
-      console.info("[wa:send] sent OK");
-      broadcast("whatsapp_result", { success: true, contact: matches[0].name });
-      return;
-    }
-    console.info("[wa:send] multiple matches, broadcasting picker");
-    broadcast("whatsapp_picker", {
-      matches: matches.slice(0, 5).map((c) => ({ id: c.id._serialized, name: c.name })),
-      message,
-    });
-  } catch (e) {
-    console.error("[wa:send] error:", e?.stack || e?.message || e);
-    broadcast("whatsapp_result", { success: false, error: String(e?.message || e) });
   }
 }
 
@@ -1347,24 +1196,6 @@ async function processRecording() {
       return;
     }
 
-    // WhatsApp agent intercept
-    console.info("[wa] enabled:", settings.whatsapp_enabled, "status:", whatsappStatus);
-    if (settings.whatsapp_enabled && whatsappStatus === "ready") {
-      const intent = await detectWhatsappIntent(rawText).catch((e) => {
-        console.error("[wa:intent] error:", e?.message ?? e);
-        return null;
-      });
-      console.info("[wa:intent] result:", intent);
-      if (intent?.action === "send_whatsapp") {
-        try {
-          await executeWhatsappSend(intent.contact, intent.message);
-        } finally {
-          broadcast("transcription_done", { text: "", mode: currentMode });
-        }
-        return;
-      }
-    }
-
     // Esperar la captura de seleccion (corre en paralelo con la grabacion).
     if (agentCapturePromise) {
       await agentCapturePromise.catch(() => {});
@@ -1708,10 +1539,6 @@ function registerIpc(updateTrayMenu) {
           enabled: settings.sound_effects_enabled,
           volume: settings.sound_effects_volume,
         });
-        if ("whatsapp_enabled" in (args.input || {})) {
-          if (args.input.whatsapp_enabled && !whatsappClient) initWhatsapp();
-          else if (!args.input.whatsapp_enabled && whatsappClient) destroyWhatsapp();
-        }
         broadcast("frontend_state_changed", {});
         return getFrontendState();
       case "test_groq":
@@ -1782,19 +1609,6 @@ function registerIpc(updateTrayMenu) {
         broadcast("explain_chunk", String(explainData?.output || ""));
         broadcast("explain_done", {});
         return;
-      case "get_whatsapp_status":
-        return { status: whatsappStatus, qr: whatsappQr };
-      case "send_whatsapp_message":
-        await executeWhatsappSend(String(args.contact || ""), String(args.message || ""));
-        return { ok: true };
-      case "save_anthropic_api_key": {
-        const key = (args.key || "").trim();
-        if (key) secrets.anthropic_api_key = key;
-        else delete secrets.anthropic_api_key;
-        await persistState();
-        broadcast("frontend_state_changed", {});
-        return;
-      }
       default:
         throw new Error(`Comando no soportado: ${command}`);
     }
@@ -1873,7 +1687,6 @@ app.on("second-instance", (_event, argv) => {
 
 app.whenReady().then(async () => {
   await ensureStorageLoaded();
-  if (settings.whatsapp_enabled) initWhatsapp();
   await refreshAccountFromBackend().catch((error) => {
     console.warn("[auth] account refresh skipped:", error instanceof Error ? error.message : String(error));
   });
