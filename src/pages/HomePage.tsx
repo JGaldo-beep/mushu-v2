@@ -4,11 +4,9 @@ import { useState } from "react";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { CopyButton } from "@/components/CopyButton";
 import { tauri } from "@/lib/tauri";
-import { GlassCard } from "@/components/GlassCard";
 import { MetricCard } from "@/components/MetricCard";
 import { ModeChip } from "@/components/ModeChip";
 import { ShortcutKbd } from "@/components/ShortcutKbd";
-import { ShineBorder } from "@/components/ui/shine-border";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { TextAnimate } from "@/components/ui/text-animate";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,7 +18,15 @@ import { Skeleton } from "@/components/Skeleton";
 import { useHistoryContext } from "@/context/HistoryContext";
 import { Ripple } from "@/components/ui/ripple";
 import { HistoryPage } from "@/pages/HistoryPage";
-import { MODE_COLORS, MODE_ICONS, MODE_ICONS_BY_NAME, MODE_LABELS, MODE_NAMES, modeColor, modeLabel } from "@/lib/modes";
+import {
+  MODE_COLORS,
+  MODE_ICONS,
+  MODE_ICONS_BY_NAME,
+  MODE_LABELS,
+  MODE_NAMES,
+  modeColor,
+  modeLabel,
+} from "@/lib/modes";
 import type { ModeName, NavSection } from "@/lib/types";
 
 function RowCopyButton({ text }: { text: string }) {
@@ -39,17 +45,19 @@ function RowCopyButton({ text }: { text: string }) {
     <button
       type="button"
       onClick={onCopy}
-      aria-label={copied ? "Copiado" : "Copiar"}
+      aria-label={copied ? "Copied" : "Copy"}
       className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
       style={{
         width: "28px",
         height: "28px",
         borderRadius: "8px",
-        background: copied ? "rgba(209,255,58,0.14)" : "rgba(255,255,255,0.06)",
+        background: copied
+          ? "color-mix(in oklab, var(--primary) 14%, transparent)"
+          : "transparent",
         border: copied
-          ? "0.5px solid rgba(209,255,58,0.42)"
-          : "0.5px solid rgba(255,255,255,0.10)",
-        color: copied ? "var(--accent-primary)" : "var(--text-secondary)",
+          ? "0.5px solid color-mix(in oklab, var(--primary) 42%, transparent)"
+          : "0.5px solid var(--border)",
+        color: copied ? "var(--primary)" : "var(--muted-foreground)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -58,11 +66,7 @@ function RowCopyButton({ text }: { text: string }) {
         transition: "background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s",
       }}
     >
-      {copied ? (
-        <Check size={13} strokeWidth={2.5} />
-      ) : (
-        <Copy size={13} strokeWidth={2.25} />
-      )}
+      {copied ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2.25} />}
     </button>
   );
 }
@@ -71,11 +75,11 @@ function relativeTime(iso: string) {
   const now = new Date();
   const then = new Date(iso);
   const diff = (now.getTime() - then.getTime()) / 1000;
-  if (diff < 60) return "ahora mismo";
-  if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
-  if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`;
-  if (diff < 86400 * 2) return "ayer";
-  return then.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} h ago`;
+  if (diff < 86400 * 2) return "yesterday";
+  return then.toLocaleDateString("en-US", { day: "numeric", month: "short" });
 }
 
 type HomePageProps = {
@@ -101,31 +105,36 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
   return (
     <div className="flex h-full flex-col" style={{ minHeight: 0 }}>
       {/* Topbar */}
-      <div className="mushu-topbar flex items-center justify-between px-5 py-3" style={{ flexShrink: 0 }}>
+      <div
+        className="mushu-topbar flex items-center justify-between px-6 py-4"
+        style={{ flexShrink: 0 }}
+      >
         <div className="flex items-center gap-3">
-          <SidebarTrigger style={{ color: "var(--text-secondary)" }} />
+          <SidebarTrigger style={{ color: "var(--muted-foreground)" }} />
           <div>
-            <p
+            <h1
               style={{
                 fontFamily: "'Geist Variable', sans-serif",
-                fontSize: "16px",
+                fontSize: "20px",
                 fontWeight: 600,
-                color: "var(--text-primary)",
-                lineHeight: 1.2,
-                letterSpacing: "-0.01em",
+                color: "var(--foreground)",
+                lineHeight: 1.15,
+                letterSpacing: "-0.025em",
+                margin: 0,
               }}
             >
-              Inicio
-            </p>
+              Home
+            </h1>
             <p
               style={{
                 fontFamily: "'Geist Variable', sans-serif",
-                fontSize: "12px",
+                fontSize: "12.5px",
                 fontWeight: 450,
-                color: "var(--text-muted)",
+                color: "var(--muted-foreground)",
+                marginTop: "2px",
               }}
             >
-              Listo para dictar
+              Ready to dictate
             </p>
           </div>
         </div>
@@ -136,24 +145,28 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 type="button"
                 className="flex items-center gap-2 rounded-full px-3 py-1.5"
                 style={{
-                  background: modeOpen ? "var(--glass-bg-strong)" : "var(--glass-bg)",
-                  border: "0.5px solid var(--glass-border-outer)",
-                  boxShadow: "inset 0 1px 0 var(--glass-border)",
-                  backdropFilter: "blur(8px)",
+                  background: "var(--card)",
+                  border: "0.5px solid var(--border)",
                   cursor: "pointer",
-                  transition: "background 0.15s",
+                  transition: "background 0.15s, border-color 0.15s",
                 }}
               >
                 <span
                   className="animate-mode-pulse rounded-full"
-                  style={{ width: "6px", height: "6px", background: mode.color, flexShrink: 0, display: "block" }}
+                  style={{
+                    width: "6px",
+                    height: "6px",
+                    background: mode.color,
+                    flexShrink: 0,
+                    display: "block",
+                  }}
                 />
                 <span
                   style={{
                     fontFamily: "'Geist Variable', sans-serif",
                     fontSize: "12px",
                     fontWeight: 500,
-                    color: "var(--text-primary)",
+                    color: "var(--foreground)",
                   }}
                 >
                   {mode.label}
@@ -162,7 +175,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   size={11}
                   strokeWidth={2.5}
                   style={{
-                    color: "var(--text-muted)",
+                    color: "var(--muted-foreground)",
                     transition: "transform 0.2s",
                     transform: modeOpen ? "rotate(180deg)" : "rotate(0deg)",
                   }}
@@ -173,19 +186,24 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
               align="end"
               sideOffset={8}
               style={{
-                background: "oklch(15% 0.08 209 / 0.96)",
-                border: "0.5px solid var(--glass-border)",
-                backdropFilter: "blur(20px) saturate(140%)",
-                WebkitBackdropFilter: "blur(20px) saturate(140%)",
-                borderRadius: "14px",
+                background: "var(--popover)",
+                border: "0.5px solid var(--border)",
+                borderRadius: "calc(var(--radius) * 0.8)",
                 padding: "14px",
                 width: "280px",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.45)",
               }}
             >
               <div className="mb-3 flex items-center justify-between">
-                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-muted)" }}>
-                  Modo de dictado
+                <span
+                  style={{
+                    fontFamily: "'Space Mono', monospace",
+                    fontSize: "9px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    color: "var(--muted-foreground)",
+                  }}
+                >
+                  Dictation mode
                 </span>
                 <ShortcutKbd keys={modeHotkeyParts} size="sm" />
               </div>
@@ -210,24 +228,28 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                         gap: "6px",
                         padding: "12px 6px 10px",
                         borderRadius: "10px",
-                        background: isActive ? `${color}14` : "var(--glass-bg-subtle)",
-                        border: isActive ? `0.5px solid ${color}50` : "0.5px solid var(--glass-border-outer)",
-                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+                        background: isActive ? `${color}14` : "transparent",
+                        border: isActive
+                          ? `0.5px solid ${color}55`
+                          : "0.5px solid var(--border)",
                         cursor: "pointer",
-                        transition: "all 0.15s",
+                        transition: "background 0.15s, border-color 0.15s",
                       }}
                     >
                       <Icon
                         size={18}
                         strokeWidth={isActive ? 2.25 : 1.85}
-                        style={{ color: isActive ? color : "var(--text-secondary)", flexShrink: 0 }}
+                        style={{
+                          color: isActive ? color : "var(--muted-foreground)",
+                          flexShrink: 0,
+                        }}
                       />
                       <span
                         style={{
                           fontFamily: "'Geist Variable', sans-serif",
                           fontSize: "11px",
                           fontWeight: isActive ? 600 : 500,
-                          color: isActive ? color : "var(--text-secondary)",
+                          color: isActive ? color : "var(--muted-foreground)",
                           textAlign: "center",
                           lineHeight: 1.2,
                         }}
@@ -244,23 +266,21 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
       </div>
 
       {showSignedOutBanner && (
-        <div className="px-5 pt-3" style={{ flexShrink: 0 }}>
+        <div className="px-6 pt-4" style={{ flexShrink: 0 }}>
           <div
             role="status"
-            className="flex items-center gap-3 rounded-[12px] px-4 py-3"
+            className="flex items-center gap-3 rounded-xl px-4 py-3"
             style={{
-              background: "rgba(209,255,58,0.06)",
-              border: "0.5px solid rgba(209,255,58,0.32)",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
+              border: "0.5px solid var(--border)",
+              background: "color-mix(in oklab, var(--accent) 24%, transparent)",
             }}
           >
             <div
               style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                background: "color-mix(in oklab, var(--primary) 12%, transparent)",
-                border: "0.5px solid color-mix(in oklab, var(--primary) 32%, transparent)",
+                width: "28px",
+                height: "28px",
+                borderRadius: "999px",
+                background: "color-mix(in oklab, var(--primary) 16%, transparent)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -268,7 +288,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 color: "var(--primary)",
               }}
             >
-              <LogIn size={15} strokeWidth={2.25} />
+              <LogIn size={14} strokeWidth={2.25} />
             </div>
             <div className="min-w-0 flex-1">
               <p
@@ -276,23 +296,23 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   fontFamily: "'Geist Variable', sans-serif",
                   fontSize: "13px",
                   fontWeight: 600,
-                  color: "var(--text-primary)",
+                  color: "var(--foreground)",
                   lineHeight: 1.3,
                 }}
               >
-                No has iniciado sesión en Mushu
+                You're not signed in to Mushu
               </p>
               <p
                 style={{
                   fontFamily: "'Geist Variable', sans-serif",
                   fontSize: "12px",
                   fontWeight: 450,
-                  color: "var(--text-secondary)",
+                  color: "var(--muted-foreground)",
                   lineHeight: 1.4,
                   marginTop: "2px",
                 }}
               >
-                Necesitas iniciar sesión para usar dictado, agente y minutos del trial.
+                Sign in to use dictation, the agent, and trial minutes.
               </p>
             </div>
             <button
@@ -303,27 +323,27 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 fontSize: "12px",
                 fontWeight: 600,
                 color: "var(--primary-foreground)",
-                background: "var(--primary)",
+                background: "var(--foreground)",
                 border: "none",
-                borderRadius: "8px",
-                padding: "8px 14px",
+                borderRadius: "999px",
+                padding: "8px 16px",
                 cursor: "pointer",
                 flexShrink: 0,
-                transition: "filter 0.15s",
+                transition: "opacity 0.15s",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(1.08)")}
-              onMouseLeave={(e) => (e.currentTarget.style.filter = "brightness(1)")}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.88")}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
             >
-              Iniciar sesión
+              Sign in
             </button>
           </div>
         </div>
       )}
 
       {/* Scrollable content */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         {/* Metrics grid — 4 cards */}
-        <div className="grid grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-4 gap-3">
           {loading ? (
             Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} style={{ height: "78px" }} />
@@ -331,40 +351,40 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
           ) : (
             <>
               <MetricCard
-                label="Palabras hoy"
+                label="Words today"
                 value={metrics.wordsToday}
                 delta={metrics.wordsTodayDelta ?? undefined}
               />
               <MetricCard
-                label="Palabras / sem."
+                label="Words / wk."
                 value={metrics.wordsWeek}
                 delta={metrics.wordsWeekDelta ?? undefined}
               />
               <MetricCard
-                label="Min. / sem."
+                label="Min / wk."
                 value={metrics.minutesWeek}
                 unit="min"
                 delta={metrics.minutesWeekDelta ?? undefined}
               />
               <MetricCard
-                label="Vel. media"
+                label="Avg. speed"
                 value={metrics.velocityToday}
-                unit={metrics.velocityToday !== "--" ? "pal/min" : ""}
+                unit={metrics.velocityToday !== "--" ? "wpm" : ""}
                 delta={metrics.velocityTodayDelta ?? undefined}
               />
             </>
           )}
         </div>
 
-        {/* Recording area */}
-        <div className="mt-4">
-          <GlassCard
-            className="relative flex flex-col items-center justify-center overflow-hidden"
+        {/* Recording area — calm, type-driven hero */}
+        <div className="mt-6">
+          <div
+            className="relative flex flex-col items-center justify-center overflow-hidden rounded-2xl"
             style={{
-              minHeight: "260px",
-              padding: "24px",
-              background:
-                "radial-gradient(circle at 50% 60%, rgba(209,255,58,0.08) 0%, var(--glass-bg) 60%)",
+              minHeight: "280px",
+              padding: "32px 24px",
+              border: "0.5px solid var(--border)",
+              background: "color-mix(in oklab, var(--card) 60%, transparent)",
             }}
           >
             <AnimatePresence mode="wait">
@@ -375,15 +395,15 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.22 }}
-                  className="flex flex-col items-center gap-5"
+                  className="flex flex-col items-center gap-6"
                 >
                   <span
                     style={{
                       fontFamily: "'Space Mono', monospace",
                       fontSize: "9.5px",
                       textTransform: "uppercase",
-                      letterSpacing: "0.18em",
-                      color: "var(--text-muted)",
+                      letterSpacing: "0.22em",
+                      color: "var(--muted-foreground)",
                       fontWeight: 700,
                     }}
                   >
@@ -399,19 +419,16 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                             display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            minWidth: "60px",
+                            minWidth: "64px",
                             height: "52px",
-                            padding: "0 16px",
+                            padding: "0 18px",
                             borderRadius: "12px",
                             fontFamily: "'Space Mono', monospace",
                             fontSize: "16px",
                             fontWeight: 700,
-                            color: "var(--text-primary)",
-                            background:
-                              "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 100%)",
-                            border: "0.5px solid rgba(255,255,255,0.12)",
-                            boxShadow:
-                              "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.30), 0 4px 12px rgba(0,0,0,0.35)",
+                            color: "var(--foreground)",
+                            background: "var(--card)",
+                            border: "0.5px solid var(--border)",
                             letterSpacing: "0.02em",
                           }}
                         >
@@ -423,7 +440,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                               fontFamily: "'Space Mono', monospace",
                               fontSize: "16px",
                               fontWeight: 500,
-                              color: "var(--text-muted)",
+                              color: "var(--muted-foreground)",
                             }}
                           >
                             +
@@ -437,20 +454,22 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     style={{
                       fontFamily: "'Geist Variable', sans-serif",
                       fontSize: "13.5px",
-                      fontWeight: 500,
-                      color: "var(--text-secondary)",
+                      fontWeight: 450,
+                      color: "var(--muted-foreground)",
                       textAlign: "center",
+                      maxWidth: "420px",
+                      lineHeight: 1.55,
                     }}
                   >
-                    Mantén el atajo y habla en cualquier app · suelta para transcribir
+                    Hold the shortcut and talk in any app — release to transcribe.
                   </p>
 
                   <div
                     aria-hidden
                     style={{
                       width: "60px",
-                      height: "1px",
-                      background: "rgba(255,255,255,0.10)",
+                      height: "0.5px",
+                      background: "var(--border)",
                     }}
                   />
 
@@ -460,12 +479,12 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                         fontFamily: "'Space Mono', monospace",
                         fontSize: "9.5px",
                         textTransform: "uppercase",
-                        letterSpacing: "0.12em",
-                        color: "var(--text-muted)",
+                        letterSpacing: "0.16em",
+                        color: "var(--muted-foreground)",
                         fontWeight: 700,
                       }}
                     >
-                      Agent Mode
+                      Agent mode
                     </span>
                     <ShortcutKbd keys={modeHotkeyParts} size="sm" />
                   </div>
@@ -490,30 +509,40 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     <div
                       className="flex items-center gap-2 rounded-full px-3 py-1"
                       style={{
-                        background: "var(--glass-bg-strong)",
-                        border: "0.5px solid var(--glass-border-outer)",
-                        backdropFilter: "blur(8px)",
-                        boxShadow: "inset 0 1px 0 var(--glass-border)",
+                        background: "var(--card)",
+                        border: "0.5px solid var(--border)",
                       }}
                     >
                       <span className="relative flex size-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-                        <span className="relative inline-flex size-2 rounded-full bg-red-500" />
+                        <span
+                          className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                          style={{ background: "var(--destructive)" }}
+                        />
+                        <span
+                          className="relative inline-flex size-2 rounded-full"
+                          style={{ background: "var(--destructive)" }}
+                        />
                       </span>
                       <span
                         style={{
                           fontFamily: "'Geist Variable', sans-serif",
                           fontSize: "12px",
                           fontWeight: 500,
-                          color: "var(--text-primary)",
+                          color: "var(--foreground)",
                         }}
                       >
-                        Escuchando…
+                        Listening…
                       </span>
                     </div>
                     <ShortcutKbd keys={hotkeyParts} />
-                    <p style={{ fontFamily: "'Space Mono', monospace", fontSize: "11px", color: "var(--text-muted)" }}>
-                      Suelta para transcribir
+                    <p
+                      style={{
+                        fontFamily: "'Space Mono', monospace",
+                        fontSize: "11px",
+                        color: "var(--muted-foreground)",
+                      }}
+                    >
+                      Release to transcribe
                     </p>
                   </div>
                 </motion.div>
@@ -529,12 +558,28 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   className="flex flex-col items-center gap-3"
                 >
                   <div className="flex gap-1.5">
-                    <span className="size-2 animate-bounce rounded-full [animation-delay:-0.3s]" style={{ background: "var(--primary)" }} />
-                    <span className="size-2 animate-bounce rounded-full [animation-delay:-0.15s]" style={{ background: "var(--primary)" }} />
-                    <span className="size-2 animate-bounce rounded-full" style={{ background: "var(--primary)" }} />
+                    <span
+                      className="size-2 animate-bounce rounded-full [animation-delay:-0.3s]"
+                      style={{ background: "var(--primary)" }}
+                    />
+                    <span
+                      className="size-2 animate-bounce rounded-full [animation-delay:-0.15s]"
+                      style={{ background: "var(--primary)" }}
+                    />
+                    <span
+                      className="size-2 animate-bounce rounded-full"
+                      style={{ background: "var(--primary)" }}
+                    />
                   </div>
-                  <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "14px", fontWeight: 500, color: "var(--text-secondary)" }}>
-                    Transcribiendo…
+                  <p
+                    style={{
+                      fontFamily: "'Geist Variable', sans-serif",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      color: "var(--muted-foreground)",
+                    }}
+                  >
+                    Transcribing…
                   </p>
                 </motion.div>
               )}
@@ -549,19 +594,12 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   className="w-full max-w-xl px-2"
                 >
                   <div
-                    className="relative overflow-hidden rounded-[12px] p-5"
+                    className="relative overflow-hidden rounded-2xl p-5"
                     style={{
-                      background: "var(--glass-bg-strong)",
-                      border: "0.5px solid var(--glass-border-outer)",
-                      backdropFilter: "blur(12px)",
-                      boxShadow: "inset 0 1px 0 var(--glass-border)",
+                      background: "var(--card)",
+                      border: "0.5px solid var(--border)",
                     }}
                   >
-                    <ShineBorder
-                      borderWidth={1}
-                      duration={6}
-                      shineColor={["#81B09A", "#C6DACC", "#EDE6DB"]}
-                    />
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <ModeChip mode={mode} />
                       <CopyButton text={resultText} variant="ghost" />
@@ -577,7 +615,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                         fontSize: "15px",
                         fontWeight: 450,
                         lineHeight: 1.6,
-                        color: "var(--text-primary)",
+                        color: "var(--foreground)",
                       }}
                     >
                       {resultText}
@@ -596,35 +634,44 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   className="w-full max-w-md px-2"
                 >
                   <div
-                    className="rounded-[12px] p-4"
+                    className="rounded-2xl p-4"
                     style={{
-                      background: "rgba(220,38,38,0.08)",
-                      border: "0.5px solid rgba(220,38,38,0.25)",
+                      background:
+                        "color-mix(in oklab, var(--destructive) 10%, transparent)",
+                      border:
+                        "0.5px solid color-mix(in oklab, var(--destructive) 35%, transparent)",
                     }}
                   >
-                    <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "14px", fontWeight: 500, color: "var(--delta-red)" }}>
+                    <p
+                      style={{
+                        fontFamily: "'Geist Variable', sans-serif",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        color: "var(--destructive)",
+                      }}
+                    >
                       {errorMessage}
                     </p>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
-          </GlassCard>
+          </div>
         </div>
 
-        {/* Inline history panel */}
-        <div className="mt-4">
-          <div className="mb-2 flex items-center justify-between">
+        {/* Recent history — slim rows, divided by hairlines */}
+        <div className="mt-6">
+          <div className="mb-3 flex items-center justify-between">
             <span
               style={{
                 fontFamily: "'Space Mono', monospace",
                 fontSize: "9px",
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
-                color: "var(--text-muted)",
+                color: "var(--muted-foreground)",
               }}
             >
-              Historial reciente
+              Recent history
             </span>
             <button
               type="button"
@@ -634,16 +681,18 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 fontFamily: "'Geist Variable', sans-serif",
                 fontSize: "11.5px",
                 fontWeight: 500,
-                color: "var(--text-secondary)",
+                color: "var(--muted-foreground)",
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
                 transition: "color 0.15s",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent-hover)")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--primary)")}
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.color = "var(--muted-foreground)")
+              }
             >
-              Ver todo
+              See all
               <ChevronRight size={12} strokeWidth={2.25} />
             </button>
           </div>
@@ -655,84 +704,105 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
               ))}
             </div>
           ) : recentHistory.length === 0 ? (
-            <GlassCard className="p-6 text-center">
+            <div
+              className="rounded-2xl p-6 text-center"
+              style={{
+                border: "0.5px solid var(--border)",
+                background: "color-mix(in oklab, var(--card) 50%, transparent)",
+              }}
+            >
               <p
                 style={{
                   fontFamily: "'Geist Variable', sans-serif",
                   fontSize: "13px",
                   fontWeight: 450,
-                  color: "var(--text-muted)",
+                  color: "var(--muted-foreground)",
                 }}
               >
-                Aún no hay sesiones. Mantén el atajo y empieza a hablar.
+                No sessions yet. Hold the shortcut and start talking.
               </p>
-            </GlassCard>
+            </div>
           ) : (
-            <div className="flex flex-col gap-2">
-              {recentHistory.map((item) => {
-                const Icon = MODE_ICONS[MODE_ICONS_BY_NAME[item.mode_used as ModeName] ?? "Mic"] ?? MODE_ICONS.Mic;
+            <div
+              className="rounded-2xl overflow-hidden"
+              style={{
+                border: "0.5px solid var(--border)",
+                background: "color-mix(in oklab, var(--card) 50%, transparent)",
+              }}
+            >
+              {recentHistory.map((item, i) => {
+                const Icon =
+                  MODE_ICONS[MODE_ICONS_BY_NAME[item.mode_used as ModeName] ?? "Mic"] ??
+                  MODE_ICONS.Mic;
                 const color = modeColor(item.mode_used);
                 const label = modeLabel(item.mode_used);
                 const text = item.processed_text || item.raw_text;
                 return (
-                  <GlassCard key={item.id} className="group px-3 py-2.5">
-                    <div className="flex items-start gap-3">
-                      <div
-                        style={{
-                          width: "28px",
-                          height: "28px",
-                          borderRadius: "8px",
-                          background: `${color}14`,
-                          border: `0.5px solid ${color}30`,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Icon size={13} strokeWidth={2} style={{ color }} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-0.5 flex items-center gap-2">
-                          <span
-                            style={{
-                              fontFamily: "'Geist Variable', sans-serif",
-                              fontSize: "11.5px",
-                              fontWeight: 600,
-                              color: "var(--text-primary)",
-                            }}
-                          >
-                            {label}
-                          </span>
-                          <span
-                            style={{
-                              fontFamily: "'Space Mono', monospace",
-                              fontSize: "10px",
-                              color: "var(--text-muted)",
-                            }}
-                          >
-                            · {relativeTime(item.timestamp)}
-                          </span>
-                        </div>
-                        <p
+                  <div
+                    key={item.id}
+                    className="group flex items-start gap-3 px-4 py-3"
+                    style={{
+                      borderTop:
+                        i === 0 ? "none" : "0.5px solid var(--border)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "26px",
+                        height: "26px",
+                        borderRadius: "8px",
+                        background: `${color}14`,
+                        border: `0.5px solid ${color}30`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        marginTop: "2px",
+                      }}
+                    >
+                      <Icon size={13} strokeWidth={2} style={{ color }} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-0.5 flex items-center gap-2">
+                        <span
                           style={{
                             fontFamily: "'Geist Variable', sans-serif",
-                            fontSize: "12.5px",
-                            fontWeight: 450,
-                            color: "var(--text-secondary)",
-                            lineHeight: 1.5,
-                            display: "-webkit-box",
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
+                            fontSize: "11.5px",
+                            fontWeight: 600,
+                            color: "var(--foreground)",
                           }}
                         >
-                          {text}
-                        </p>
+                          {label}
+                        </span>
+                        <span
+                          style={{
+                            fontFamily: "'Space Mono', monospace",
+                            fontSize: "10px",
+                            color: "var(--muted-foreground)",
+                          }}
+                        >
+                          · {relativeTime(item.timestamp)}
+                        </span>
                       </div>
-                      <RowCopyButton text={text} />
+                      <p
+                        style={{
+                          fontFamily: "'Geist Variable', sans-serif",
+                          fontSize: "12.5px",
+                          fontWeight: 450,
+                          color:
+                            "color-mix(in oklab, var(--foreground) 75%, transparent)",
+                          lineHeight: 1.5,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {text}
+                      </p>
                     </div>
-                  </GlassCard>
+                    <RowCopyButton text={text} />
+                  </div>
                 );
               })}
             </div>
@@ -745,15 +815,12 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
           side="right"
           className="w-[560px] sm:max-w-[560px] p-0"
           style={{
-            background: "oklch(13% 0.08 209 / 0.96)",
-            border: "0.5px solid var(--glass-border)",
-            backdropFilter: "blur(20px) saturate(140%)",
-            WebkitBackdropFilter: "blur(20px) saturate(140%)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06), -8px 0 32px rgba(0,0,0,0.40)",
+            background: "var(--background)",
+            border: "0.5px solid var(--border)",
           }}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Historial completo</SheetTitle>
+            <SheetTitle>Full history</SheetTitle>
           </SheetHeader>
           <HistoryPage embedded />
         </SheetContent>
@@ -761,4 +828,3 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
     </div>
   );
 }
-

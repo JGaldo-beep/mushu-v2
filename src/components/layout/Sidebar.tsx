@@ -64,11 +64,11 @@ export function AppSidebar({ section, onSectionChange }: AppSidebarProps) {
                       style={
                         isActive
                           ? {
-                              borderLeft: "2px solid var(--accent-primary)",
+                              borderLeft: "2px solid var(--primary)",
                               borderRadius: "0 8px 8px 0",
                               paddingLeft: "calc(0.5rem - 2px)",
-                              background: "rgba(209,255,58,0.12)",
-                              color: "var(--accent-hover)",
+                              background: "color-mix(in oklab, var(--primary) 12%, transparent)",
+                              color: "var(--primary)",
                               fontWeight: 500,
                             }
                           : { color: "var(--text-secondary)", fontWeight: 500 }

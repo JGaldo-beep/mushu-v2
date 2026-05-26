@@ -10,9 +10,9 @@ interface GlassCardProps {
 }
 
 const VARIANT_BG: Record<NonNullable<GlassCardProps["variant"]>, string> = {
-  default: "var(--glass-bg)",
-  strong: "var(--glass-bg-strong)",
-  subtle: "var(--glass-bg-subtle)",
+  default: "var(--card)",
+  strong: "var(--card)",
+  subtle: "color-mix(in oklab, var(--card) 50%, transparent)",
 };
 
 export function GlassCard({
@@ -24,14 +24,10 @@ export function GlassCard({
 }: GlassCardProps) {
   return (
     <div
-      className={cn("rounded-[14px]", className)}
+      className={cn("rounded-2xl", className)}
       style={{
         background: VARIANT_BG[variant],
-        border: "0.5px solid var(--glass-border-outer)",
-        boxShadow:
-          "inset 0 1px 0 var(--glass-border), 0 1px 2px rgba(0,0,0,0.20), 0 8px 24px rgba(0,0,0,0.30)",
-        backdropFilter: "blur(20px) saturate(140%)",
-        WebkitBackdropFilter: "blur(20px) saturate(140%)",
+        border: "0.5px solid var(--border)",
         ...style,
       }}
       onClick={onClick}

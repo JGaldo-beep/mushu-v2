@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/Sidebar";
 import { TitleBar } from "@/components/TitleBar";
+import { Particles } from "@/components/Particles";
 import type { NavSection } from "@/lib/types";
 
 interface AppShellProps {
@@ -18,16 +19,21 @@ export function AppShell({ children, section, onSectionChange }: AppShellProps) 
         width: "100vw",
         height: "100vh",
         overflow: "hidden",
+        background: "var(--background)",
       }}
     >
-      <div aria-hidden="true" className="mushu-app-bg-base absolute inset-0 z-0" />
-      <div aria-hidden="true" className="mushu-app-bg-glow absolute inset-0 z-[1]" />
-      <div aria-hidden="true" className="mushu-app-bg-depth absolute inset-0 z-[1]" />
+      <Particles
+        className="pointer-events-none absolute inset-0 z-0"
+        quantity={36}
+        color="#81B09A"
+        size={1.4}
+        opacity={0.22}
+      />
 
       <div
         style={{
           position: "relative",
-          zIndex: 2,
+          zIndex: 1,
           display: "flex",
           flexDirection: "column",
           width: "100%",

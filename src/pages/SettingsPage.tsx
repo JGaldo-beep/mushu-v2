@@ -253,9 +253,9 @@ function HotkeyCapture({
           fontWeight: 500,
           padding: "6px 12px",
           borderRadius: "8px",
-          background: "rgba(209,255,58,0.07)",
-          border: "0.5px solid rgba(209,255,58,0.45)",
-          color: "rgb(209,255,58)",
+          background: "color-mix(in oklab, var(--primary) 10%, transparent)",
+          border: "0.5px solid color-mix(in oklab, var(--primary) 42%, transparent)",
+          color: "var(--primary)",
           cursor: "default",
           outline: "none",
           minWidth: "160px",
@@ -263,7 +263,7 @@ function HotkeyCapture({
           animation: "pulse 1.4s ease-in-out infinite",
         }}
       >
-        {preview ? <KeyChips combo={preview} dim /> : "Presiona la combinación…"}
+        {preview ? <KeyChips combo={preview} dim /> : "Press the combination…"}
       </button>
     );
   }
@@ -280,10 +280,10 @@ function HotkeyCapture({
           fontFamily: "'Geist Variable', sans-serif",
           fontSize: "11px",
           fontWeight: 500,
-          color: "var(--text-muted)",
+          color: "var(--muted-foreground)",
         }}
       >
-        Cambiar
+        Change
       </button>
     </div>
   );
@@ -543,25 +543,25 @@ export function SettingsPage() {
                     fontSize: "10px",
                     fontWeight: 700,
                     background: draft?.has_deepgram_direct_key
-                      ? "rgba(22,163,74,0.10)"
+                      ? "color-mix(in oklab, var(--delta-green) 14%, transparent)"
                       : draft?.account
-                        ? "rgba(209,255,58,0.10)"
-                        : "rgba(251,146,60,0.10)",
+                        ? "color-mix(in oklab, var(--primary) 12%, transparent)"
+                        : "color-mix(in oklab, var(--destructive) 12%, transparent)",
                     border: draft?.has_deepgram_direct_key
-                      ? "0.5px solid rgba(22,163,74,0.30)"
+                      ? "0.5px solid color-mix(in oklab, var(--delta-green) 35%, transparent)"
                       : draft?.account
-                        ? "0.5px solid rgba(209,255,58,0.30)"
-                        : "0.5px solid rgba(251,146,60,0.30)",
+                        ? "0.5px solid color-mix(in oklab, var(--primary) 38%, transparent)"
+                        : "0.5px solid color-mix(in oklab, var(--destructive) 35%, transparent)",
                     color: draft?.has_deepgram_direct_key
                       ? "var(--delta-green)"
                       : draft?.account
-                        ? "rgb(209,255,58)"
-                        : "rgb(251,146,60)",
+                        ? "var(--primary)"
+                        : "var(--destructive)",
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
                   }}
                 >
-                  {draft?.has_deepgram_direct_key ? "Premium" : draft?.account ? "Estándar" : "Sin conexión"}
+                  {draft?.has_deepgram_direct_key ? "Premium" : draft?.account ? "Standard" : "Offline"}
                 </span>
               }
             />

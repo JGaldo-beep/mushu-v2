@@ -1,8 +1,9 @@
-import { ChevronsUpDown, CreditCard, LogOut, Sparkles, User } from "lucide-react";
+import { ChevronsUpDown, CreditCard, LogOut, Moon, Sparkles, Sun, User } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { useSettings } from "@/hooks/useSettings";
+import { useTheme } from "@/hooks/useTheme";
 import { tauri } from "@/lib/tauri";
 import type { NavSection } from "@/lib/types";
 
@@ -12,20 +13,23 @@ interface NavUserProps {
 
 export function NavUser({ onNavigate }: NavUserProps) {
   const { state, refresh } = useSettings();
+  const { resolved, toggle } = useTheme();
   const account = state?.account ?? null;
   const displayName = account?.user.full_name || account?.user.email || "Mushu User";
   const planLabel = account?.entitlement?.status
     ? `Plan ${account.entitlement.status}`
     : account
-      ? "Cuenta conectada"
+      ? "Account connected"
       : "Free plan";
   const initials = initialsFromAccount(account?.user.full_name || account?.user.email);
+  const nextThemeLabel = resolved === "dark" ? "Light mode" : "Dark mode";
+  const ThemeIcon = resolved === "dark" ? Sun : Moon;
 
   const logout = async () => {
     try {
       await tauri.logout();
       await refresh();
-      toast.success("Sesión cerrada");
+      toast.success("Signed out");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     }
@@ -37,8 +41,8 @@ export function NavUser({ onNavigate }: NavUserProps) {
         <SidebarMenuButton
           size="lg"
           className="data-[state=open]:bg-accent"
-          tooltip="Cuenta"
-          style={{ color: "var(--text-secondary)" }}
+          tooltip="Account"
+          style={{ color: "var(--muted-foreground)" }}
         >
           <span
             style={{
@@ -87,7 +91,7 @@ export function NavUser({ onNavigate }: NavUserProps) {
                 fontFamily: "'Geist Variable', sans-serif",
                 fontSize: "12.5px",
                 fontWeight: 600,
-                color: "var(--text-primary)",
+                color: "var(--foreground)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -99,7 +103,7 @@ export function NavUser({ onNavigate }: NavUserProps) {
               style={{
                 fontFamily: "'Space Mono', monospace",
                 fontSize: "9px",
-                color: "var(--text-muted)",
+                color: "var(--muted-foreground)",
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
               }}
@@ -109,7 +113,7 @@ export function NavUser({ onNavigate }: NavUserProps) {
           </span>
           <ChevronsUpDown
             className="ml-auto group-data-[collapsible=icon]:hidden"
-            style={{ width: "13px", height: "13px", color: "var(--text-muted)" }}
+            style={{ width: "13px", height: "13px", color: "var(--muted-foreground)" }}
             strokeWidth={2}
           />
         </SidebarMenuButton>
@@ -118,14 +122,11 @@ export function NavUser({ onNavigate }: NavUserProps) {
         side="right"
         align="end"
         sideOffset={8}
-        className="w-56 p-1.5"
+        className="w-60 p-1.5"
         style={{
-          background: "color-mix(in oklab, var(--popover) 96%, transparent)",
+          background: "var(--popover)",
           border: "0.5px solid var(--border)",
-          backdropFilter: "blur(20px) saturate(140%)",
-          WebkitBackdropFilter: "blur(20px) saturate(140%)",
-          boxShadow:
-            "inset 0 1px 0 var(--border), 0 8px 24px rgba(0,0,0,0.30)",
+          borderRadius: "calc(var(--radius) * 0.8)",
         }}
       >
         <div style={{ padding: "8px 10px 6px" }}>
@@ -134,7 +135,7 @@ export function NavUser({ onNavigate }: NavUserProps) {
               fontFamily: "'Geist Variable', sans-serif",
               fontSize: "12.5px",
               fontWeight: 600,
-              color: "var(--text-primary)",
+              color: "var(--foreground)",
             }}
           >
             {displayName}
@@ -143,7 +144,7 @@ export function NavUser({ onNavigate }: NavUserProps) {
             style={{
               fontFamily: "'Space Mono', monospace",
               fontSize: "9px",
-              color: "var(--text-muted)",
+              color: "var(--muted-foreground)",
               textTransform: "uppercase",
               letterSpacing: "0.08em",
               marginTop: "2px",
@@ -153,28 +154,29 @@ export function NavUser({ onNavigate }: NavUserProps) {
           </div>
         </div>
 
-        <div style={{ height: "0.5px", background: "var(--glass-border-outer)", margin: "4px 0" }} />
+        <Divider />
 
-        <MenuItem
-          icon={Sparkles}
-          label="Mi Perfil"
-          onClick={() => onNavigate("account")}
-        />
-        <MenuItem
-          icon={CreditCard}
-          label="Planes"
-          onClick={() => onNavigate("account")}
-        />
+        <MenuItem icon={ThemeIcon} label={nextThemeLabel} onClick={toggle} />
 
-        <div style={{ height: "0.5px", background: "var(--glass-border-outer)", margin: "4px 0" }} />
+        <Divider />
 
-        <MenuItem
-          icon={LogOut}
-          label="Cerrar sesión"
-          onClick={() => void logout()}
-        />
+        <MenuItem icon={Sparkles} label="Profile" onClick={() => onNavigate("account")} />
+        <MenuItem icon={CreditCard} label="Plans" onClick={() => onNavigate("account")} />
+
+        <Divider />
+
+        <MenuItem icon={LogOut} label="Sign out" onClick={() => void logout()} />
       </PopoverContent>
     </Popover>
+  );
+}
+
+function Divider() {
+  return (
+    <div
+      aria-hidden
+      style={{ height: "0.5px", background: "var(--border)", margin: "4px 0" }}
+    />
   );
 }
 
@@ -211,24 +213,29 @@ function MenuItem({ icon: Icon, label, onClick, disabled }: MenuItemProps) {
         padding: "7px 10px",
         background: "transparent",
         border: "none",
-        borderRadius: "6px",
+        borderRadius: "8px",
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
         fontFamily: "'Geist Variable', sans-serif",
         fontSize: "12.5px",
         fontWeight: 500,
-        color: "var(--text-primary)",
+        color: "var(--foreground)",
         textAlign: "left",
         transition: "background 0.12s",
       }}
       onMouseEnter={(e) => {
-        if (!disabled) e.currentTarget.style.background = "var(--accent)";
+        if (!disabled)
+          e.currentTarget.style.background =
+            "color-mix(in oklab, var(--accent) 60%, transparent)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
       }}
     >
-      <Icon style={{ width: "14px", height: "14px", color: "var(--text-secondary)" }} strokeWidth={2} />
+      <Icon
+        style={{ width: "14px", height: "14px", color: "var(--muted-foreground)" }}
+        strokeWidth={2}
+      />
       <span>{label}</span>
     </button>
   );

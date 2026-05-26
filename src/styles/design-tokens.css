@@ -39,10 +39,10 @@ body {
   font-weight: 450;
 }
 
-/* Sidebar backdrop blur */
+/* Sidebar — flat, hairline divider, no backdrop blur */
 [data-sidebar="sidebar"] {
-  backdrop-filter: blur(20px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
+  background: color-mix(in oklab, var(--sidebar) 96%, transparent) !important;
+  border-right: 0.5px solid var(--border) !important;
 }
 
 /* Active sidebar item: left accent border */
@@ -94,21 +94,17 @@ body {
   animation: mushu-pulse 2.4s ease-in-out infinite;
 }
 
-/* Topbar glass — subtle band that follows theme */
+/* Topbar — single hairline divider, no blur, transparent so the page bg shows */
 .mushu-topbar {
-  background: color-mix(in oklab, var(--background) 75%, transparent);
+  background: transparent;
   border-bottom: 0.5px solid var(--border);
-  backdrop-filter: blur(12px) saturate(140%);
-  -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
 
 /* Glass input */
 .glass-input {
-  background: color-mix(in oklab, var(--input) 70%, transparent) !important;
+  background: var(--card) !important;
   border: 0.5px solid var(--border) !important;
   color: var(--foreground) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 .glass-input::placeholder {
   color: var(--muted-foreground) !important;
@@ -119,20 +115,18 @@ body {
   outline: none !important;
 }
 
-/* Glass button */
+/* Glass button — flat outline that switches to sage on hover */
 .glass-btn {
-  background: color-mix(in oklab, var(--background) 60%, transparent);
+  background: transparent;
   border: 0.5px solid var(--border);
   color: var(--muted-foreground);
   transition:
     background 0.15s,
     border-color 0.15s,
     color 0.15s;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 .glass-btn:hover {
-  background: color-mix(in oklab, var(--primary) 14%, transparent);
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
   border-color: color-mix(in oklab, var(--primary) 40%, transparent);
   color: var(--primary);
 }
@@ -142,53 +136,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* App-shell ambient background — light cream / soft sage radial.
- * Dark mode overrides below switch to deep onyx with subtle sage hint.
- */
-.mushu-app-bg-base {
-  background:
-    radial-gradient(ellipse at 50% -10%, #C6DACC 0%, #EDE6DB 40%, #FEFCF5 100%);
+/* First-paint stagger — used by hero sections to reveal content calmly */
+@keyframes mushu-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
-.mushu-app-bg-glow {
-  background:
-    radial-gradient(
-      circle at 92% -10%,
-      color-mix(in oklab, var(--primary) 28%, transparent) 0%,
-      color-mix(in oklab, var(--primary) 12%, transparent) 30%,
-      transparent 55%
-    );
-}
-
-.mushu-app-bg-depth {
-  background:
-    radial-gradient(
-      circle at 5% 110%,
-      color-mix(in oklab, var(--accent) 35%, transparent) 0%,
-      transparent 50%
-    );
-}
-
-.dark .mushu-app-bg-base {
-  background:
-    radial-gradient(ellipse at 50% -10%, #1a2e24 0%, #1a1917 45%, #0F0E0D 100%);
-}
-
-.dark .mushu-app-bg-glow {
-  background:
-    radial-gradient(
-      circle at 92% -10%,
-      color-mix(in oklab, var(--primary) 18%, transparent) 0%,
-      color-mix(in oklab, var(--primary) 6%, transparent) 30%,
-      transparent 55%
-    );
-}
-
-.dark .mushu-app-bg-depth {
-  background:
-    radial-gradient(
-      circle at 5% 110%,
-      color-mix(in oklab, var(--accent) 22%, transparent) 0%,
-      transparent 50%
-    );
+.mushu-rise {
+  animation: mushu-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

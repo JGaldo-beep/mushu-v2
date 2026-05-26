@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { applyTheme, watchSystemTheme } from "@/lib/theme";
+import { applyTheme, resolveTheme, watchSystemTheme } from "@/lib/theme";
 import { tauri } from "@/lib/tauri";
 import type { SaveSettingsInput, ThemePref } from "@/lib/types";
 
+type Resolved = "light" | "dark";
+
 export function useTheme() {
   const [theme, setThemeState] = useState<ThemePref>("system");
+  const [resolved, setResolved] = useState<Resolved>("light");
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -15,22 +18,28 @@ export function useTheme() {
           s.theme === "light" || s.theme === "dark" || s.theme === "system" ? s.theme : "system";
         setThemeState(t);
         applyTheme(t);
+        setResolved(resolveTheme(t));
         setLoaded(true);
       })
       .catch(() => {
         applyTheme("system");
+        setResolved(resolveTheme("system"));
         setLoaded(true);
       });
   }, []);
 
   useEffect(() => {
     if (theme !== "system") return;
-    return watchSystemTheme(() => applyTheme("system"));
+    return watchSystemTheme(() => {
+      applyTheme("system");
+      setResolved(resolveTheme("system"));
+    });
   }, [theme]);
 
   const setTheme = async (next: ThemePref) => {
     setThemeState(next);
     applyTheme(next);
+    setResolved(resolveTheme(next));
     if (!loaded) return;
     try {
       const state = await tauri.getFrontendState();
@@ -52,5 +61,9 @@ export function useTheme() {
     }
   };
 
-  return { theme, setTheme };
+  const toggle = () => {
+    void setTheme(resolved === "dark" ? "light" : "dark");
+  };
+
+  return { theme, resolved, setTheme, toggle };
 }
