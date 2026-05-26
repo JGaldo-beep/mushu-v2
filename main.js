@@ -306,10 +306,21 @@ function resolveMushuStreamUrl(apiBaseUrl) {
   const override = normalizeBaseUrl(process.env.MUSHU_STREAM_URL || process.env.VITE_MUSHU_STREAM_URL);
   if (override) return override;
   const url = new URL(apiBaseUrl);
+
+  // Local dev convenience: localhost:3000 → ws://localhost:3001 (separate local stream)
   if (url.hostname === "localhost" && url.port === "3000") {
     url.port = "3001";
+    url.protocol = "ws:";
+    url.pathname = "/api/mushu/stream";
+    url.search = "";
+    return url.toString();
   }
+
+  // Production default: stream lives on stream.<api host>
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  if (!url.hostname.startsWith("stream.")) {
+    url.hostname = `stream.${url.hostname}`;
+  }
   url.pathname = "/api/mushu/stream";
   url.search = "";
   return url.toString();

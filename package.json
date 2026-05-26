@@ -36,8 +36,7 @@
       "dist/**/*",
       "main.js",
       "preload.cjs",
-      "package.json",
-      ".env"
+      "package.json"
     ],
     "asar": true,
     "asarUnpack": [
