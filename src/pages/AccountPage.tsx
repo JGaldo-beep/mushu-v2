@@ -1,9 +1,14 @@
-import { CreditCard, ExternalLink, LogIn, LogOut, RefreshCw, Sparkles, User } from "lucide-react";
+import {
+  CreditCard,
+  ExternalLink,
+  LogOut,
+  RefreshCw,
+  Sparkles,
+  User,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/GlassCard";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useSettings } from "@/hooks/useSettings";
 import { tauri } from "@/lib/tauri";
@@ -42,39 +47,20 @@ function initialsFromAccount(account: MushuAccount | null): string {
 
 export function AccountPage() {
   const { state, loading, refresh } = useSettings();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const account = state?.account ?? null;
   const minutes = remainingMinutes(account?.entitlement ?? null);
   const minuteBarMax = Math.max(minutes ?? 0, account?.entitlement?.status === "trial" ? 120 : 60);
-  const minutePercent = minutes === null ? 0 : minuteBarMax > 0 ? Math.min(100, Math.round((minutes / minuteBarMax) * 100)) : 0;
+  const minutePercent =
+    minutes === null ? 0 : minuteBarMax > 0 ? Math.min(100, Math.round((minutes / minuteBarMax) * 100)) : 0;
   const webBaseUrl = (state?.api_base_url || "https://mushu.space").replace(/\/$/, "");
-
-  const login = async () => {
-    if (!email.trim() || !password) {
-      toast.error("Escribe correo y contraseña");
-      return;
-    }
-    setBusy(true);
-    try {
-      await tauri.login(email, password);
-      setPassword("");
-      await refresh();
-      toast.success("Sesión iniciada");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const logout = async () => {
     setBusy(true);
     try {
       await tauri.logout();
       await refresh();
-      toast.success("Sesión cerrada");
+      toast.success("Signed out");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -87,7 +73,7 @@ export function AccountPage() {
     try {
       await tauri.refreshAccount();
       await refresh();
-      toast.success("Cuenta actualizada");
+      toast.success("Account refreshed");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -97,7 +83,25 @@ export function AccountPage() {
 
   const openWebLogin = async () => {
     try {
-      await tauri.openExternalUrl(`${webBaseUrl}/mushu/login`);
+      await tauri.openExternalUrl(`${webBaseUrl}/login`);
+      toast.message("Opened browser — sign in there and come back");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const openWebSignup = async () => {
+    try {
+      await tauri.openExternalUrl(`${webBaseUrl}/signup`);
+      toast.message("Opened browser — create your account there");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const openWebDashboard = async () => {
+    try {
+      await tauri.openExternalUrl(`${webBaseUrl}/dashboard`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     }
@@ -106,39 +110,41 @@ export function AccountPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div
-        className="mushu-topbar flex items-center justify-between px-5 py-3"
+        className="mushu-topbar flex items-center justify-between px-6 py-4"
         style={{ flexShrink: 0 }}
       >
         <div className="flex items-center gap-3">
-          <SidebarTrigger style={{ color: "var(--text-secondary)" }} />
+          <SidebarTrigger style={{ color: "var(--muted-foreground)" }} />
           <div>
-            <p
+            <h1
               style={{
                 fontFamily: "'Geist Variable', sans-serif",
-                fontSize: "16px",
+                fontSize: "20px",
                 fontWeight: 600,
-                color: "var(--text-primary)",
-                lineHeight: 1.2,
-                letterSpacing: "-0.01em",
+                color: "var(--foreground)",
+                lineHeight: 1.15,
+                letterSpacing: "-0.025em",
+                margin: 0,
               }}
             >
-              Cuenta
-            </p>
+              Account
+            </h1>
             <p
               style={{
                 fontFamily: "'Geist Variable', sans-serif",
-                fontSize: "12px",
+                fontSize: "12.5px",
                 fontWeight: 450,
-                color: "var(--text-muted)",
+                color: "var(--muted-foreground)",
+                marginTop: "2px",
               }}
             >
-              Tu plan y sesión
+              Managed on the web — synced to your desktop
             </p>
           </div>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
           <GlassCard className="p-5">
             <div className="flex items-center gap-4">
@@ -183,18 +189,18 @@ export function AccountPage() {
                     fontFamily: "'Geist Variable', sans-serif",
                     fontSize: "16px",
                     fontWeight: 600,
-                    color: "var(--text-primary)",
+                    color: "var(--foreground)",
                     letterSpacing: "-0.01em",
                   }}
                 >
-                  {account?.user.full_name || account?.user.email || "Inicia sesión"}
+                  {account?.user.full_name || account?.user.email || "Not signed in"}
                 </h3>
                 {account?.user.full_name && account.user.email ? (
                   <p
                     style={{
                       fontFamily: "'Geist Variable', sans-serif",
                       fontSize: "12px",
-                      color: "var(--text-muted)",
+                      color: "var(--muted-foreground)",
                       marginTop: "2px",
                     }}
                   >
@@ -202,31 +208,41 @@ export function AccountPage() {
                   </p>
                 ) : null}
                 <p
+                  className="tracking-widest"
                   style={{
                     fontFamily: "'Space Mono', monospace",
                     fontSize: "10px",
-                    color: "var(--text-muted)",
+                    color: "var(--muted-foreground)",
                     textTransform: "uppercase",
-                    letterSpacing: "0.1em",
                     marginTop: "2px",
                   }}
                 >
                   {account
                     ? account.entitlement
-                      ? `Plan ${account.entitlement.status || "trial"} · ${minutes} min disponibles`
-                      : "Sesion conectada · sincronizacion pendiente"
-                    : "Conecta tu cuenta para activar el trial"}
+                      ? `Plan ${account.entitlement.status || "trial"} · ${minutes} min available`
+                      : "Account connected · sync pending"
+                    : "Connect your account to activate the trial"}
                 </p>
                 {account ? (
                   <div className="mt-3">
-                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-2 overflow-hidden rounded-full"
+                      style={{
+                        background: "color-mix(in oklab, var(--foreground) 10%, transparent)",
+                      }}
+                    >
                       <div
                         className="h-full rounded-full bg-primary transition-all duration-500"
                         style={{ width: `${minutePercent}%` }}
                       />
                     </div>
-                    <div className="mt-2 flex items-center justify-between text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
-                      <span>{minutes === null ? "Sincronizando minutos" : `${minutes} minutos restantes`}</span>
+                    <div
+                      className="mt-2 flex items-center justify-between text-[10px] uppercase tracking-widest"
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
+                      <span>
+                        {minutes === null ? "Syncing minutes" : `${minutes} minutes remaining`}
+                      </span>
                       <span>{minutePercent}%</span>
                     </div>
                   </div>
@@ -236,74 +252,115 @@ export function AccountPage() {
           </GlassCard>
 
           {!account ? (
-            <GlassCard className="p-5">
-              <div className="mb-4 flex items-start gap-3">
-                <LogIn size={18} strokeWidth={2} style={{ color: "var(--primary)" }} />
+            <GlassCard className="p-6">
+              <div className="mb-5 flex flex-col items-center gap-3 text-center">
+                <div
+                  style={{
+                    width: "44px",
+                    height: "44px",
+                    borderRadius: "999px",
+                    background: "color-mix(in oklab, var(--primary) 14%, transparent)",
+                    border: "0.5px solid color-mix(in oklab, var(--primary) 38%, transparent)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <ExternalLink size={18} strokeWidth={2} style={{ color: "var(--primary)" }} />
+                </div>
                 <div>
                   <h3
                     style={{
                       fontFamily: "'Geist Variable', sans-serif",
-                      fontSize: "14px",
+                      fontSize: "18px",
                       fontWeight: 600,
-                      color: "var(--text-primary)",
+                      color: "var(--foreground)",
+                      letterSpacing: "-0.02em",
+                      lineHeight: 1.2,
                     }}
                   >
-                    Entrar al beta
+                    Sign in on the web
                   </h3>
                   <p
                     style={{
                       fontFamily: "'Geist Variable', sans-serif",
-                      fontSize: "12.5px",
+                      fontSize: "13px",
                       fontWeight: 450,
-                      color: "var(--text-secondary)",
-                      lineHeight: 1.5,
-                      marginTop: "4px",
+                      color: "var(--muted-foreground)",
+                      lineHeight: 1.55,
+                      marginTop: "6px",
+                      maxWidth: "420px",
                     }}
                   >
-                    Entra con correo y contrasena o crea tu cuenta desde la web.
+                    Account, billing and plans live on mushu.space. Sign in there and your
+                    browser hands the session back to this desktop app automatically — no
+                    second password to manage.
                   </p>
                 </div>
               </div>
-              <div className="space-y-3">
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="correo@dominio.com"
-                  autoComplete="email"
-                  disabled={busy || loading}
-                />
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Contraseña"
-                  autoComplete="current-password"
-                  disabled={busy || loading}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void login();
-                  }}
-                />
-                <Button className="w-full gap-2" disabled={busy || loading} onClick={() => void login()}>
-                  <LogIn size={15} strokeWidth={2} />
-                  {busy ? "Entrando..." : "Iniciar sesión"}
-                </Button>
+
+              <button
+                type="button"
+                onClick={() => void openWebLogin()}
+                disabled={busy || loading}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  width: "100%",
+                  padding: "12px 20px",
+                  borderRadius: "999px",
+                  background: "var(--foreground)",
+                  color: "var(--background)",
+                  border: "none",
+                  fontFamily: "'Geist Variable', sans-serif",
+                  fontSize: "13.5px",
+                  fontWeight: 600,
+                  cursor: busy || loading ? "not-allowed" : "pointer",
+                  opacity: busy || loading ? 0.55 : 1,
+                  transition: "opacity 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  if (!(busy || loading)) e.currentTarget.style.opacity = "0.88";
+                }}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+              >
+                <ExternalLink size={15} strokeWidth={2.2} />
+                Sign in via the web
+              </button>
+
+              <p
+                className="tracking-widest"
+                style={{
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: "9.5px",
+                  textTransform: "uppercase",
+                  color: "var(--muted-foreground)",
+                  textAlign: "center",
+                  marginTop: "14px",
+                }}
+              >
+                Don't have an account?{" "}
                 <button
                   type="button"
-                  className="glass-btn flex w-full items-center justify-center gap-2 rounded-lg py-2.5"
-                  onClick={() => void openWebLogin()}
-                  disabled={busy || loading}
+                  onClick={() => void openWebSignup()}
                   style={{
-                    fontFamily: "'Geist Variable', sans-serif",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    opacity: busy || loading ? 0.55 : 1,
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    color: "var(--primary)",
+                    fontFamily: "inherit",
+                    fontSize: "inherit",
+                    letterSpacing: "inherit",
+                    textTransform: "inherit",
+                    cursor: "pointer",
+                    textDecoration: "underline",
                   }}
                 >
-                  <ExternalLink size={14} strokeWidth={2} />
-                  Crear cuenta en la web
+                  Create one on the web
                 </button>
-              </div>
+              </p>
             </GlassCard>
           ) : null}
 
@@ -330,24 +387,24 @@ export function AccountPage() {
                     fontFamily: "'Geist Variable', sans-serif",
                     fontSize: "14px",
                     fontWeight: 600,
-                    color: "var(--text-primary)",
+                    color: "var(--foreground)",
                   }}
                 >
-                  Trial activo
+                  Trial active
                 </h3>
                 <p
                   style={{
                     fontFamily: "'Geist Variable', sans-serif",
                     fontSize: "12.5px",
                     fontWeight: 450,
-                    color: "var(--text-secondary)",
+                    color: "var(--muted-foreground)",
                     lineHeight: 1.5,
                     marginTop: "4px",
                   }}
                 >
                   {minutes === null
-                    ? "Recarga para ver tus minutos disponibles."
-                    : `Tienes ${minutes} minutos disponibles. Cada dictado descuenta segundos de tu plan.`}
+                    ? "Refresh to see your available minutes."
+                    : `You have ${minutes} minutes available. Each dictation deducts seconds from your plan.`}
                 </p>
               </div>
             </div>
@@ -366,7 +423,7 @@ export function AccountPage() {
             >
               <span className="inline-flex items-center justify-center gap-2">
                 <RefreshCw size={14} strokeWidth={2} />
-                Actualizar minutos
+                Refresh minutes
               </span>
             </button>
           </GlassCard>
@@ -374,54 +431,70 @@ export function AccountPage() {
           <GlassCard className="p-5">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <CreditCard size={18} strokeWidth={2} style={{ color: "var(--text-secondary)" }} />
+                <CreditCard size={18} strokeWidth={2} style={{ color: "var(--muted-foreground)" }} />
                 <div>
                   <h3
                     style={{
                       fontFamily: "'Geist Variable', sans-serif",
                       fontSize: "13.5px",
                       fontWeight: 600,
-                      color: "var(--text-primary)",
+                      color: "var(--foreground)",
                     }}
                   >
-                    Facturación
+                    Billing & plans
                   </h3>
                   <p
                     style={{
                       fontFamily: "'Geist Variable', sans-serif",
                       fontSize: "12px",
                       fontWeight: 450,
-                      color: "var(--text-muted)",
+                      color: "var(--muted-foreground)",
                     }}
                   >
-                    No necesitas método de pago para el trial.
+                    Managed on the web. The desktop just consumes your active plan.
                   </p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => void openWebDashboard()}
+                className="glass-btn inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5"
+                style={{
+                  fontFamily: "'Geist Variable', sans-serif",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  flexShrink: 0,
+                }}
+              >
+                Open on web
+                <ExternalLink size={11} strokeWidth={2.2} />
+              </button>
             </div>
           </GlassCard>
 
-          <GlassCard className="p-5">
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-2 py-1"
-              onClick={() => void logout()}
-              disabled={busy || loading || !account}
-              style={{
-                fontFamily: "'Geist Variable', sans-serif",
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "var(--delta-red)",
-                background: "transparent",
-                border: "none",
-                cursor: busy || loading || !account ? "not-allowed" : "pointer",
-                opacity: busy || loading || !account ? 0.55 : 1,
-              }}
-            >
-              <LogOut size={15} strokeWidth={2} />
-              Cerrar sesión
-            </button>
-          </GlassCard>
+          {account ? (
+            <GlassCard className="p-5">
+              <button
+                type="button"
+                className="flex w-full items-center justify-center gap-2 py-1"
+                onClick={() => void logout()}
+                disabled={busy || loading}
+                style={{
+                  fontFamily: "'Geist Variable', sans-serif",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "var(--destructive)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: busy || loading ? "not-allowed" : "pointer",
+                  opacity: busy || loading ? 0.55 : 1,
+                }}
+              >
+                <LogOut size={15} strokeWidth={2} />
+                Sign out
+              </button>
+            </GlassCard>
+          ) : null}
         </div>
       </div>
     </div>
