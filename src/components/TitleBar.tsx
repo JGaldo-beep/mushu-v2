@@ -10,7 +10,7 @@ const BTN_BASE: React.CSSProperties = {
   background: "transparent",
   border: "none",
   cursor: "pointer",
-  color: "rgba(243,231,201,0.45)",
+  color: "color-mix(in oklab, var(--foreground) 45%, transparent)",
   transition: "background 0.12s, color 0.12s",
   flexShrink: 0,
 };
@@ -30,11 +30,11 @@ function WinBtn({
       style={BTN_BASE}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = hoverBg;
-        e.currentTarget.style.color = "#f3e7c9";
+        e.currentTarget.style.color = "var(--foreground)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = "rgba(243,231,201,0.45)";
+        e.currentTarget.style.color = "color-mix(in oklab, var(--foreground) 45%, transparent)";
       }}
       onClick={onClick}
     >
@@ -66,7 +66,10 @@ export function TitleBar() {
       >
         <Square size={10} strokeWidth={2} />
       </WinBtn>
-      <WinBtn hoverBg="rgba(196,50,28,0.85)" onClick={() => void window.mushu.invoke("window_close")}>
+      <WinBtn
+        hoverBg="color-mix(in oklab, var(--destructive) 85%, transparent)"
+        onClick={() => void window.mushu.invoke("window_close")}
+      >
         <X size={13} strokeWidth={2} />
       </WinBtn>
     </div>

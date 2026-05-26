@@ -9,20 +9,23 @@ export const MODE_ICONS: Record<ModeIconName, LucideIcon> = {
 
 export const MODE_LABELS: Record<ModeName, string> = {
   DEFAULT: "General",
-  EMAIL: "Correo",
-  NOTE: "Nota",
+  EMAIL: "Email",
+  NOTE: "Note",
 };
 
 export const MODE_DESCRIPTIONS: Record<ModeName, string> = {
-  DEFAULT: "Transcripción limpia, sin retoques.",
-  EMAIL: "Tono formal y párrafos estructurados.",
-  NOTE: "Casual, viñetas y fragmentos permitidos.",
+  DEFAULT: "Clean transcription, no rewrites.",
+  EMAIL: "Formal tone, structured paragraphs.",
+  NOTE: "Casual, bullets and fragments allowed.",
 };
 
+// Mode colors are sage-family variations so they sit cohesively next to the
+// canonical primary on both light and dark backgrounds. Picked from the
+// chart palette in src/index.css (chart-1, chart-3, chart-4).
 export const MODE_COLORS: Record<ModeName, string> = {
-  DEFAULT: "#d1ff3a",
-  EMAIL: "#5fb5d8",
-  NOTE: "#cfc0e5",
+  DEFAULT: "#81B09A",
+  EMAIL: "#4E7561",
+  NOTE: "#B7CFB9",
 };
 
 export const MODE_ICONS_BY_NAME: Record<ModeName, ModeIconName> = {
@@ -56,11 +59,11 @@ export function normalizeMode(m: Partial<ModeInfo> & { name?: string }): ModeInf
 /** Display label for any mode string (including legacy ones from old history). */
 export function modeLabel(name: string): string {
   if (name in MODE_LABELS) return MODE_LABELS[name as ModeName];
-  return name; // legacy / unknown — show raw
+  return name;
 }
 
 /** Display color for any mode string. */
 export function modeColor(name: string): string {
   if (name in MODE_COLORS) return MODE_COLORS[name as ModeName];
-  return "#8a8a95";
+  return "#8A8278";
 }

@@ -19,11 +19,13 @@ export function GlassToggle({ value, onChange, disabled }: GlassToggleProps) {
         width: "38px",
         height: "22px",
         borderRadius: "11px",
-        background: value ? "#d1ff3a" : "rgba(255,255,255,0.10)",
+        background: value ? "var(--primary)" : "color-mix(in oklab, var(--foreground) 10%, transparent)",
         border: "0.5px solid",
-        borderColor: value ? "rgba(209,255,58,0.55)" : "rgba(255,255,255,0.10)",
+        borderColor: value
+          ? "color-mix(in oklab, var(--primary) 55%, transparent)"
+          : "color-mix(in oklab, var(--foreground) 10%, transparent)",
         boxShadow: value
-          ? "inset 0 1px 0 rgba(255,255,255,0.45), 0 0 12px rgba(209,255,58,0.30)"
+          ? "inset 0 1px 0 rgba(255,255,255,0.45), 0 0 12px color-mix(in oklab, var(--primary) 30%, transparent)"
           : "inset 0 1px 0 rgba(255,255,255,0.05)",
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,

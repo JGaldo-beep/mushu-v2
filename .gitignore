@@ -144,6 +144,11 @@ vite.config.ts.timestamp-*
 
 .claude
 .agents
+.CLAUDE.md
+
+# Puppeteer / WhatsApp Web cache (regenerated per session)
+.wwebjs_cache/
+.wwebjs_auth/
 
 # Electron-builder output (installers, unpacked builds)
 release/

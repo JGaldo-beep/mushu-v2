@@ -49,7 +49,7 @@ export function AccountPage() {
   const minutes = remainingMinutes(account?.entitlement ?? null);
   const minuteBarMax = Math.max(minutes ?? 0, account?.entitlement?.status === "trial" ? 120 : 60);
   const minutePercent = minutes === null ? 0 : minuteBarMax > 0 ? Math.min(100, Math.round((minutes / minuteBarMax) * 100)) : 0;
-  const webBaseUrl = (state?.api_base_url || "https://juangaldo.com").replace(/\/$/, "");
+  const webBaseUrl = (state?.api_base_url || "https://mushu.space").replace(/\/$/, "");
 
   const login = async () => {
     if (!email.trim() || !password) {
@@ -165,7 +165,7 @@ export function AccountPage() {
                 ) : account ? (
                   <span
                     style={{
-                      color: "#d1ff3a",
+                      color: "var(--primary)",
                       fontFamily: "'Space Mono', monospace",
                       fontSize: "14px",
                       fontWeight: 700,
@@ -174,7 +174,7 @@ export function AccountPage() {
                     {initialsFromAccount(account)}
                   </span>
                 ) : (
-                  <User size={22} strokeWidth={2} style={{ color: "#d1ff3a" }} />
+                  <User size={22} strokeWidth={2} style={{ color: "var(--primary)" }} />
                 )}
               </div>
               <div className="min-w-0 flex-1">
@@ -221,7 +221,7 @@ export function AccountPage() {
                   <div className="mt-3">
                     <div className="h-2 overflow-hidden rounded-full bg-white/10">
                       <div
-                        className="h-full rounded-full bg-[#d1ff3a] transition-all duration-500"
+                        className="h-full rounded-full bg-primary transition-all duration-500"
                         style={{ width: `${minutePercent}%` }}
                       />
                     </div>
@@ -238,7 +238,7 @@ export function AccountPage() {
           {!account ? (
             <GlassCard className="p-5">
               <div className="mb-4 flex items-start gap-3">
-                <LogIn size={18} strokeWidth={2} style={{ color: "#d1ff3a" }} />
+                <LogIn size={18} strokeWidth={2} style={{ color: "var(--primary)" }} />
                 <div>
                   <h3
                     style={{
@@ -322,7 +322,7 @@ export function AccountPage() {
                   flexShrink: 0,
                 }}
               >
-                <Sparkles size={18} strokeWidth={2} style={{ color: "#d1ff3a" }} />
+                <Sparkles size={18} strokeWidth={2} style={{ color: "var(--primary)" }} />
               </div>
               <div>
                 <h3

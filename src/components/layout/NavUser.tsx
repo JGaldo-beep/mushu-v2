@@ -45,8 +45,8 @@ export function NavUser({ onNavigate }: NavUserProps) {
               width: "30px",
               height: "30px",
               borderRadius: "50%",
-              background: "rgba(209,255,58,0.14)",
-              border: "0.5px solid rgba(209,255,58,0.42)",
+              background: "color-mix(in oklab, var(--primary) 14%, transparent)",
+              border: "0.5px solid color-mix(in oklab, var(--primary) 42%, transparent)",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
@@ -63,7 +63,7 @@ export function NavUser({ onNavigate }: NavUserProps) {
             ) : account ? (
               <span
                 style={{
-                  color: "#d1ff3a",
+                  color: "var(--primary)",
                   fontFamily: "'Space Mono', monospace",
                   fontSize: "10px",
                   fontWeight: 700,
@@ -72,7 +72,10 @@ export function NavUser({ onNavigate }: NavUserProps) {
                 {initials}
               </span>
             ) : (
-              <User style={{ width: "14px", height: "14px", color: "#d1ff3a" }} strokeWidth={2.25} />
+              <User
+                style={{ width: "14px", height: "14px", color: "var(--primary)" }}
+                strokeWidth={2.25}
+              />
             )}
           </span>
           <span
@@ -117,12 +120,12 @@ export function NavUser({ onNavigate }: NavUserProps) {
         sideOffset={8}
         className="w-56 p-1.5"
         style={{
-          background: "oklch(15% 0.08 209 / 0.96)",
-          border: "0.5px solid var(--glass-border)",
+          background: "color-mix(in oklab, var(--popover) 96%, transparent)",
+          border: "0.5px solid var(--border)",
           backdropFilter: "blur(20px) saturate(140%)",
           WebkitBackdropFilter: "blur(20px) saturate(140%)",
           boxShadow:
-            "inset 0 1px 0 var(--glass-border), 0 8px 24px rgba(0,0,0,0.40)",
+            "inset 0 1px 0 var(--border), 0 8px 24px rgba(0,0,0,0.30)",
         }}
       >
         <div style={{ padding: "8px 10px 6px" }}>

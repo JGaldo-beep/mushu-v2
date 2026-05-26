@@ -1,19 +1,36 @@
 import type { ThemePref } from "./types";
 
-/**
- * Mushu is a light-only app. The theme preference still exists in the settings
- * payload (backend compat), but the UI never applies the `.dark` class.
- */
-export function resolveTheme(_pref: ThemePref): "light" {
-  return "light";
+const SYSTEM_DARK_MEDIA = "(prefers-color-scheme: dark)";
+
+function isSystemDark(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia(SYSTEM_DARK_MEDIA).matches;
 }
 
-export function applyTheme(_pref: ThemePref) {
+export function resolveTheme(pref: ThemePref): "light" | "dark" {
+  if (pref === "light" || pref === "dark") return pref;
+  return isSystemDark() ? "dark" : "light";
+}
+
+export function applyTheme(pref: ThemePref) {
+  if (typeof document === "undefined") return;
   const root = document.documentElement;
-  root.classList.remove("dark");
-  root.dataset.theme = "light";
+  const resolved = resolveTheme(pref);
+  root.classList.toggle("dark", resolved === "dark");
+  root.dataset.theme = resolved;
+  root.style.colorScheme = resolved;
 }
 
-export function watchSystemTheme(_onChange: () => void) {
-  return () => {};
+export function watchSystemTheme(onChange: () => void): () => void {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return () => {};
+  }
+  const mq = window.matchMedia(SYSTEM_DARK_MEDIA);
+  const handler = () => onChange();
+  if (typeof mq.addEventListener === "function") {
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }
+  mq.addListener(handler);
+  return () => mq.removeListener(handler);
 }

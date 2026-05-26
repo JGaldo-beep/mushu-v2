@@ -73,6 +73,7 @@ export function useSettings() {
         sound_effects_enabled: draft.sound_effects_enabled,
         sound_effects_volume: draft.sound_effects_volume,
         deepgram_replacements: draft.deepgram_replacements ?? [],
+        whatsapp_enabled: draft.whatsapp_enabled,
       };
       const updated = await tauri.saveSettings(input);
       setState(updated);

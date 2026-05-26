@@ -259,13 +259,13 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 width: "32px",
                 height: "32px",
                 borderRadius: "8px",
-                background: "rgba(209,255,58,0.10)",
-                border: "0.5px solid rgba(209,255,58,0.32)",
+                background: "color-mix(in oklab, var(--primary) 12%, transparent)",
+                border: "0.5px solid color-mix(in oklab, var(--primary) 32%, transparent)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
-                color: "#d1ff3a",
+                color: "var(--primary)",
               }}
             >
               <LogIn size={15} strokeWidth={2.25} />
@@ -302,8 +302,8 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 fontFamily: "'Geist Variable', sans-serif",
                 fontSize: "12px",
                 fontWeight: 600,
-                color: "#0a0a0a",
-                background: "#d1ff3a",
+                color: "var(--primary-foreground)",
+                background: "var(--primary)",
                 border: "none",
                 borderRadius: "8px",
                 padding: "8px 14px",
@@ -529,9 +529,9 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   className="flex flex-col items-center gap-3"
                 >
                   <div className="flex gap-1.5">
-                    <span className="size-2 animate-bounce rounded-full [animation-delay:-0.3s]" style={{ background: "#d1ff3a" }} />
-                    <span className="size-2 animate-bounce rounded-full [animation-delay:-0.15s]" style={{ background: "#d1ff3a" }} />
-                    <span className="size-2 animate-bounce rounded-full" style={{ background: "#d1ff3a" }} />
+                    <span className="size-2 animate-bounce rounded-full [animation-delay:-0.3s]" style={{ background: "var(--primary)" }} />
+                    <span className="size-2 animate-bounce rounded-full [animation-delay:-0.15s]" style={{ background: "var(--primary)" }} />
+                    <span className="size-2 animate-bounce rounded-full" style={{ background: "var(--primary)" }} />
                   </div>
                   <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "14px", fontWeight: 500, color: "var(--text-secondary)" }}>
                     Transcribiendo…
@@ -560,7 +560,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     <ShineBorder
                       borderWidth={1}
                       duration={6}
-                      shineColor={["#d1ff3a", "#e7ff7a", "#f0ffaa"]}
+                      shineColor={["#81B09A", "#C6DACC", "#EDE6DB"]}
                     />
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <ModeChip mode={mode} />

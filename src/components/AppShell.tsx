@@ -20,43 +20,10 @@ export function AppShell({ children, section, onSectionChange }: AppShellProps) 
         overflow: "hidden",
       }}
     >
-      {/* Layer 0: deep teal abyss gradient base */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 0,
-          background:
-            "radial-gradient(ellipse at 50% -10%, oklch(22% 0.08 209) 0%, oklch(15% 0.08 209) 55%, oklch(10% 0.08 209) 100%)",
-        }}
-      />
+      <div aria-hidden="true" className="mushu-app-bg-base absolute inset-0 z-0" />
+      <div aria-hidden="true" className="mushu-app-bg-glow absolute inset-0 z-[1]" />
+      <div aria-hidden="true" className="mushu-app-bg-depth absolute inset-0 z-[1]" />
 
-      {/* Layer 1: signature lime glow top-right */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 1,
-          background:
-            "radial-gradient(circle at 92% -10%, oklch(92% 0.2653 125 / 0.10) 0%, oklch(92% 0.2653 125 / 0.04) 30%, transparent 55%)",
-        }}
-      />
-
-      {/* Layer 2: cool teal tint bottom-left for depth */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 1,
-          background:
-            "radial-gradient(circle at 5% 110%, oklch(40% 0.08 209 / 0.18) 0%, transparent 50%)",
-        }}
-      />
-
-      {/* Layer 3: UI shell */}
       <div
         style={{
           position: "relative",

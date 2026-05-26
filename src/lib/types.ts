@@ -44,6 +44,9 @@ export type FrontendState = {
   auto_translate_target: string;
   deepgram_replacements: DeepgramReplacement[];
   spoken_language?: string;
+  whatsapp_enabled: boolean;
+  whatsapp_status: "disconnected" | "qr" | "ready";
+  has_anthropic_key: boolean;
   account: MushuAccount | null;
 };
 
@@ -89,6 +92,7 @@ export type SaveSettingsInput = {
   auto_translate_target?: string;
   deepgram_replacements?: DeepgramReplacement[];
   spoken_language?: string;
+  whatsapp_enabled?: boolean;
 };
 
 export type HistoryItem = {
