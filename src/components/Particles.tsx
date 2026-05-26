@@ -19,7 +19,7 @@ type Particle = {
 export function Particles({
   className,
   quantity = 36,
-  color = "#81B09A",
+  color = "#737373",
   size = 1.4,
   opacity = 0.22,
 }: ParticlesProps) {

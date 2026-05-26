@@ -1,12 +1,14 @@
 import {
   CreditCard,
   ExternalLink,
+  Loader2,
   LogOut,
   RefreshCw,
   Sparkles,
   User,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/GlassCard";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -45,10 +47,29 @@ function initialsFromAccount(account: MushuAccount | null): string {
     .join("") || "M";
 }
 
+const WAITING_TIMEOUT_MS = 5 * 60 * 1000;
+
 export function AccountPage() {
   const { state, loading, refresh } = useSettings();
   const [busy, setBusy] = useState(false);
+  const [waitingForLogin, setWaitingForLogin] = useState(false);
   const account = state?.account ?? null;
+
+  // Auto-clear the waiting state as soon as the deep link delivers a session.
+  useEffect(() => {
+    if (account && waitingForLogin) {
+      setWaitingForLogin(false);
+      const label = account.user.full_name || account.user.email || "your account";
+      toast.success(`Signed in as ${label}`);
+    }
+  }, [account, waitingForLogin]);
+
+  // Bail out after a long stall — the browser might be closed or the user wandered off.
+  useEffect(() => {
+    if (!waitingForLogin) return;
+    const t = window.setTimeout(() => setWaitingForLogin(false), WAITING_TIMEOUT_MS);
+    return () => window.clearTimeout(t);
+  }, [waitingForLogin]);
   const minutes = remainingMinutes(account?.entitlement ?? null);
   const minuteBarMax = Math.max(minutes ?? 0, account?.entitlement?.status === "trial" ? 120 : 60);
   const minutePercent =
@@ -84,7 +105,7 @@ export function AccountPage() {
   const openWebLogin = async () => {
     try {
       await tauri.openExternalUrl(`${webBaseUrl}/login`);
-      toast.message("Opened browser — sign in there and come back");
+      setWaitingForLogin(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     }
@@ -93,9 +114,19 @@ export function AccountPage() {
   const openWebSignup = async () => {
     try {
       await tauri.openExternalUrl(`${webBaseUrl}/signup`);
-      toast.message("Opened browser — create your account there");
+      setWaitingForLogin(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const cancelWaiting = async () => {
+    setWaitingForLogin(false);
+    // Best-effort: also refetch in case the session landed between the click and the cancel.
+    try {
+      await refresh();
+    } catch {
+      /* ignore */
     }
   };
 
@@ -251,7 +282,98 @@ export function AccountPage() {
             </div>
           </GlassCard>
 
-          {!account ? (
+          {!account && waitingForLogin ? (
+            <GlassCard className="p-6">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div
+                  style={{
+                    width: "52px",
+                    height: "52px",
+                    borderRadius: "999px",
+                    background: "color-mix(in oklab, var(--primary) 12%, transparent)",
+                    border: "0.5px solid color-mix(in oklab, var(--primary) 40%, transparent)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Loader2
+                    size={22}
+                    strokeWidth={2}
+                    className="animate-spin"
+                    style={{ color: "var(--primary)" }}
+                  />
+                </div>
+                <div>
+                  <h3
+                    style={{
+                      fontFamily: "'Geist Variable', sans-serif",
+                      fontSize: "17px",
+                      fontWeight: 600,
+                      color: "var(--foreground)",
+                      letterSpacing: "-0.02em",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    Waiting for sign-in…
+                  </h3>
+                  <p
+                    style={{
+                      fontFamily: "'Geist Variable', sans-serif",
+                      fontSize: "13px",
+                      fontWeight: 450,
+                      color: "var(--muted-foreground)",
+                      lineHeight: 1.55,
+                      marginTop: "6px",
+                      maxWidth: "380px",
+                    }}
+                  >
+                    Finish signing in in your browser. We'll detect it automatically and
+                    sync your session — no need to come back here.
+                  </p>
+                </div>
+
+                <div className="flex w-full flex-col gap-2 pt-2 sm:flex-row sm:justify-center">
+                  <button
+                    type="button"
+                    onClick={() => void openWebLogin()}
+                    className="glass-btn inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2"
+                    style={{
+                      fontFamily: "'Geist Variable', sans-serif",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                    }}
+                  >
+                    <ExternalLink size={12} strokeWidth={2.2} />
+                    Reopen browser
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void cancelWaiting()}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2"
+                    style={{
+                      fontFamily: "'Geist Variable', sans-serif",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      color: "var(--muted-foreground)",
+                      background: "transparent",
+                      border: "0.5px solid transparent",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "var(--foreground)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "var(--muted-foreground)";
+                    }}
+                  >
+                    <X size={12} strokeWidth={2.2} />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </GlassCard>
+          ) : !account ? (
             <GlassCard className="p-6">
               <div className="mb-5 flex flex-col items-center gap-3 text-center">
                 <div

@@ -1,15 +1,13 @@
 /* ============================================================
-   Mushu component utilities and overrides
-   Token source: index.css (canonical sage palette, light + .dark).
+   Mushu component utilities and overrides — monochrome edition.
+   Token source: index.css (editorial monochrome palette).
    This file only adds component-level utilities and animations
-   that consume those tokens.
+   that consume those tokens. No chromatic accents — type and
+   spacing carry the design.
    ============================================================ */
 
-/* Backward-compat aliases for legacy token names used across components.
- * These map old lime/abyss names onto the new canonical sage palette so
- * existing inline-style consumers (~17 files) keep working without edits.
- * Long-term, components should be migrated to consume the canonical tokens
- * (var(--foreground), var(--primary), var(--border)) directly.
+/* Backward-compat aliases for legacy token names that components
+ * still consume via inline styles. All map onto the monochrome scale.
  */
 :root,
 .dark {
@@ -17,19 +15,19 @@
   --text-secondary: color-mix(in oklab, var(--foreground) 65%, transparent);
   --text-muted: color-mix(in oklab, var(--foreground) 42%, transparent);
 
-  --accent-primary: var(--primary);
-  --accent-secondary: color-mix(in oklab, var(--primary) 75%, var(--background));
-  --accent-hover: color-mix(in oklab, var(--primary) 85%, var(--foreground));
-  --accent-deep: color-mix(in oklab, var(--primary) 65%, var(--foreground));
+  --accent-primary: var(--foreground);
+  --accent-secondary: var(--muted-foreground);
+  --accent-hover: var(--foreground);
+  --accent-deep: var(--foreground);
 
-  --glass-bg: color-mix(in oklab, var(--card) 60%, transparent);
-  --glass-bg-strong: color-mix(in oklab, var(--card) 85%, transparent);
-  --glass-bg-subtle: color-mix(in oklab, var(--card) 35%, transparent);
+  --glass-bg: var(--card);
+  --glass-bg-strong: var(--card);
+  --glass-bg-subtle: var(--muted);
   --glass-border: var(--border);
-  --glass-border-outer: color-mix(in oklab, var(--border) 70%, transparent);
-  --glass-border-accent: color-mix(in oklab, var(--primary) 50%, transparent);
+  --glass-border-outer: var(--border);
+  --glass-border-accent: var(--ring);
 
-  --delta-green: #4E7561;
+  --delta-green: var(--muted-foreground);
   --delta-red: var(--destructive);
 
   --sidebar-background: var(--sidebar);
@@ -41,22 +39,24 @@ body {
 
 /* Sidebar — flat, hairline divider, no backdrop blur */
 [data-sidebar="sidebar"] {
-  background: color-mix(in oklab, var(--sidebar) 96%, transparent) !important;
+  background: var(--sidebar) !important;
   border-right: 0.5px solid var(--border) !important;
 }
 
-/* Active sidebar item: left accent border */
+/* Active sidebar item: solid left bar, no green */
 [data-sidebar="menu-button"][data-active="true"] {
-  border-left: 2px solid var(--primary) !important;
-  border-radius: 0 calc(var(--radius) * 0.4) calc(var(--radius) * 0.4) 0 !important;
+  border-left: 2px solid var(--foreground) !important;
+  border-radius: 0 var(--radius) var(--radius) 0 !important;
   padding-left: calc(0.5rem - 2px) !important;
+  background: var(--accent) !important;
+  color: var(--foreground) !important;
 }
 
-/* Sidebar group label: Space Mono */
+/* Sidebar group label: Space Mono, very muted */
 [data-sidebar="group-label"] {
   font-family: "Space Mono", ui-monospace, monospace !important;
   font-size: 9px !important;
-  letter-spacing: 0.1em !important;
+  letter-spacing: 0.12em !important;
   text-transform: uppercase !important;
   color: var(--muted-foreground) !important;
   opacity: 0.75;
@@ -71,14 +71,14 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, var(--foreground) 16%, transparent);
+  background: color-mix(in oklab, var(--foreground) 14%, transparent);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in oklab, var(--foreground) 28%, transparent);
+  background: color-mix(in oklab, var(--foreground) 26%, transparent);
 }
 
-/* Pulse animation for active mode dot */
+/* Pulse for the recording indicator dot */
 @keyframes mushu-pulse {
   0%,
   100% {
@@ -86,21 +86,21 @@ body {
     transform: scale(1);
   }
   50% {
-    opacity: 0.4;
-    transform: scale(0.7);
+    opacity: 0.45;
+    transform: scale(0.75);
   }
 }
 .animate-mode-pulse {
   animation: mushu-pulse 2.4s ease-in-out infinite;
 }
 
-/* Topbar — single hairline divider, no blur, transparent so the page bg shows */
+/* Topbar — hairline divider only */
 .mushu-topbar {
   background: transparent;
   border-bottom: 0.5px solid var(--border);
 }
 
-/* Glass input */
+/* Inputs — flat, hairline */
 .glass-input {
   background: var(--card) !important;
   border: 0.5px solid var(--border) !important;
@@ -110,12 +110,12 @@ body {
   color: var(--muted-foreground) !important;
 }
 .glass-input:focus {
-  border-color: var(--primary) !important;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 22%, transparent) !important;
+  border-color: var(--foreground) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--foreground) 12%, transparent) !important;
   outline: none !important;
 }
 
-/* Glass button — flat outline that switches to sage on hover */
+/* Secondary button — hairline outline that fills on hover */
 .glass-btn {
   background: transparent;
   border: 0.5px solid var(--border);
@@ -126,9 +126,9 @@ body {
     color 0.15s;
 }
 .glass-btn:hover {
-  background: color-mix(in oklab, var(--primary) 10%, transparent);
-  border-color: color-mix(in oklab, var(--primary) 40%, transparent);
-  color: var(--primary);
+  background: var(--accent);
+  border-color: var(--foreground);
+  color: var(--foreground);
 }
 
 /* Tabular numbers */
@@ -136,10 +136,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* First-paint stagger — used by hero sections to reveal content calmly */
+/* First-paint stagger reveal */
 @keyframes mushu-rise {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .mushu-rise {
   animation: mushu-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;

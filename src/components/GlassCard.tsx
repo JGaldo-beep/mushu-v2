@@ -12,7 +12,7 @@ interface GlassCardProps {
 const VARIANT_BG: Record<NonNullable<GlassCardProps["variant"]>, string> = {
   default: "var(--card)",
   strong: "var(--card)",
-  subtle: "color-mix(in oklab, var(--card) 50%, transparent)",
+  subtle: "transparent",
 };
 
 export function GlassCard({
@@ -24,7 +24,7 @@ export function GlassCard({
 }: GlassCardProps) {
   return (
     <div
-      className={cn("rounded-2xl", className)}
+      className={cn("rounded-md", className)}
       style={{
         background: VARIANT_BG[variant],
         border: "0.5px solid var(--border)",

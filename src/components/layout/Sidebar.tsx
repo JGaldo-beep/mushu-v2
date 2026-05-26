@@ -16,10 +16,10 @@ import {
 import type { NavSection } from "@/lib/types";
 
 const NAV_ITEMS: { value: NavSection; icon: typeof Home; label: string }[] = [
-  { value: "home", icon: Home, label: "Inicio" },
-  { value: "modes", icon: Sparkles, label: "Modos" },
+  { value: "home", icon: Home, label: "Home" },
+  { value: "modes", icon: Sparkles, label: "Modes" },
   { value: "ai-features", icon: Wand2, label: "AI Features" },
-  { value: "settings", icon: Settings, label: "Ajustes" },
+  { value: "settings", icon: Settings, label: "Settings" },
 ];
 
 interface AppSidebarProps {
@@ -39,7 +39,7 @@ export function AppSidebar({ section, onSectionChange }: AppSidebarProps) {
               fontFamily: "'Geist Variable', sans-serif",
               fontSize: "17px",
               fontWeight: 600,
-              color: "var(--text-primary)",
+              color: "var(--foreground)",
               letterSpacing: "-0.015em",
             }}
           >
@@ -50,7 +50,7 @@ export function AppSidebar({ section, onSectionChange }: AppSidebarProps) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navegación</SidebarGroupLabel>
+          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {NAV_ITEMS.map(({ value, icon: Icon, label }) => {
@@ -63,21 +63,11 @@ export function AppSidebar({ section, onSectionChange }: AppSidebarProps) {
                       tooltip={label}
                       style={
                         isActive
-                          ? {
-                              borderLeft: "2px solid var(--primary)",
-                              borderRadius: "0 8px 8px 0",
-                              paddingLeft: "calc(0.5rem - 2px)",
-                              background: "color-mix(in oklab, var(--primary) 12%, transparent)",
-                              color: "var(--primary)",
-                              fontWeight: 500,
-                            }
-                          : { color: "var(--text-secondary)", fontWeight: 500 }
+                          ? { fontWeight: 500 }
+                          : { color: "var(--muted-foreground)", fontWeight: 500 }
                       }
                     >
-                      <Icon
-                        strokeWidth={isActive ? 2.25 : 1.85}
-                        style={{ color: isActive ? "var(--accent-primary)" : undefined }}
-                      />
+                      <Icon strokeWidth={isActive ? 2.25 : 1.85} />
                       <span>{label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

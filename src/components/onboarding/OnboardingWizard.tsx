@@ -9,7 +9,7 @@ import type { MushuAccount, NavSection } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const STEP_COUNT = 5;
-const CONFETTI_COLORS = ["#81B09A", "#C6DACC", "#4E7561", "#B7CFB9", "#EDE6DB", "#C9554A"];
+const CONFETTI_COLORS = ["#0A0A0A", "#262626", "#525252", "#737373", "#A3A3A3", "#D4D4D4"];
 type ConfettiStyle = CSSProperties & {
   "--tx": string;
   "--ty": string;

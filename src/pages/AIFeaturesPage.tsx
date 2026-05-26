@@ -67,7 +67,7 @@ export function AIFeaturesPage() {
         <div className="flex flex-col gap-3">
           <FeatureCard
             icon={Wand2}
-            color="#81B09A"
+            color="#0A0A0A"
             title="AI Formatting"
             description="Refina gramática y puntuación antes de pegar."
             value={ai.formattingEnabled}
@@ -76,7 +76,7 @@ export function AIFeaturesPage() {
 
           <InfoCard
             icon={Sparkles}
-            color="#4E7561"
+            color="#525252"
             title="Modo agente"
             description="Si seleccionás texto antes de dictar, Mushu usa lo que digas como instrucción y reemplaza la selección con el resultado. Sin atajo extra ni configuración."
             example='Ejemplo: seleccionás "Hi, how are you?" → mantenés el atajo + decís "traducí al español" → te reemplaza con "Hola, ¿cómo estás?".'
@@ -84,7 +84,7 @@ export function AIFeaturesPage() {
 
           <FeatureCard
             icon={Languages}
-            color="#B7CFB9"
+            color="#737373"
             title="Auto-translate"
             description="Traduce automáticamente al idioma seleccionado."
             value={ai.autoTranslateEnabled}

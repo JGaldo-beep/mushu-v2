@@ -12,7 +12,7 @@ export function MushuReplyCard({ text, className }: { text: string; className?: 
       <ShineBorder
         borderWidth={1}
         duration={6}
-        shineColor={["#4E7561", "#81B09A", "#C6DACC"]}
+        shineColor={["#525252", "#A3A3A3", "#FAFAFA"]}
         className="rounded-[18px]"
       />
       <div className="relative z-10 flex flex-col gap-2">

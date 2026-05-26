@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { CopyButton } from "@/components/CopyButton";
 import { tauri } from "@/lib/tauri";
-import { MetricCard } from "@/components/MetricCard";
 import { ModeChip } from "@/components/ModeChip";
 import { ShortcutKbd } from "@/components/ShortcutKbd";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -19,12 +18,10 @@ import { useHistoryContext } from "@/context/HistoryContext";
 import { Ripple } from "@/components/ui/ripple";
 import { HistoryPage } from "@/pages/HistoryPage";
 import {
-  MODE_COLORS,
   MODE_ICONS,
   MODE_ICONS_BY_NAME,
   MODE_LABELS,
   MODE_NAMES,
-  modeColor,
   modeLabel,
 } from "@/lib/modes";
 import type { ModeName, NavSection } from "@/lib/types";
@@ -50,14 +47,10 @@ function RowCopyButton({ text }: { text: string }) {
       style={{
         width: "28px",
         height: "28px",
-        borderRadius: "8px",
-        background: copied
-          ? "color-mix(in oklab, var(--primary) 14%, transparent)"
-          : "transparent",
-        border: copied
-          ? "0.5px solid color-mix(in oklab, var(--primary) 42%, transparent)"
-          : "0.5px solid var(--border)",
-        color: copied ? "var(--primary)" : "var(--muted-foreground)",
+        borderRadius: "var(--radius)",
+        background: "transparent",
+        border: "0.5px solid var(--border)",
+        color: copied ? "var(--foreground)" : "var(--muted-foreground)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -80,6 +73,81 @@ function relativeTime(iso: string) {
   if (diff < 86400) return `${Math.floor(diff / 3600)} h ago`;
   if (diff < 86400 * 2) return "yesterday";
   return then.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+}
+
+interface MetricRowProps {
+  label: string;
+  value: string | number;
+  unit?: string;
+  delta?: number | null;
+  isLast?: boolean;
+}
+
+function MetricRow({ label, value, unit, delta, isLast }: MetricRowProps) {
+  const deltaSign = delta && delta > 0 ? "+" : "";
+  return (
+    <div
+      className="flex items-baseline justify-between gap-4 px-1 py-3.5"
+      style={{
+        borderBottom: isLast ? "none" : "0.5px solid var(--border)",
+      }}
+    >
+      <span
+        className="tracking-widest"
+        style={{
+          fontFamily: "'Space Mono', monospace",
+          fontSize: "10px",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          color: "var(--muted-foreground)",
+        }}
+      >
+        {label}
+      </span>
+      <div className="flex items-baseline gap-2">
+        {delta !== null && delta !== undefined ? (
+          <span
+            className="tabular"
+            style={{
+              fontFamily: "'Space Mono', monospace",
+              fontSize: "10px",
+              fontWeight: 500,
+              color: "var(--muted-foreground)",
+            }}
+          >
+            {deltaSign}
+            {delta}
+          </span>
+        ) : null}
+        <span
+          className="tabular"
+          style={{
+            fontFamily: "'Geist Variable', sans-serif",
+            fontSize: "22px",
+            fontWeight: 600,
+            color: "var(--foreground)",
+            letterSpacing: "-0.02em",
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </span>
+        {unit ? (
+          <span
+            style={{
+              fontFamily: "'Geist Variable', sans-serif",
+              fontSize: "11px",
+              fontWeight: 500,
+              color: "var(--muted-foreground)",
+              marginLeft: "2px",
+            }}
+          >
+            {unit}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 type HomePageProps = {
@@ -143,10 +211,11 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="flex items-center gap-2 rounded-full px-3 py-1.5"
+                className="flex items-center gap-2 px-3 py-1.5"
                 style={{
-                  background: "var(--card)",
+                  background: "transparent",
                   border: "0.5px solid var(--border)",
+                  borderRadius: "var(--radius)",
                   cursor: "pointer",
                   transition: "background 0.15s, border-color 0.15s",
                 }}
@@ -156,7 +225,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   style={{
                     width: "6px",
                     height: "6px",
-                    background: mode.color,
+                    background: "var(--muted-foreground)",
                     flexShrink: 0,
                     display: "block",
                   }}
@@ -188,18 +257,18 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
               style={{
                 background: "var(--popover)",
                 border: "0.5px solid var(--border)",
-                borderRadius: "calc(var(--radius) * 0.8)",
+                borderRadius: "var(--radius)",
                 padding: "14px",
                 width: "280px",
               }}
             >
               <div className="mb-3 flex items-center justify-between">
                 <span
+                  className="tracking-widest"
                   style={{
                     fontFamily: "'Space Mono', monospace",
                     fontSize: "9px",
                     textTransform: "uppercase",
-                    letterSpacing: "0.1em",
                     color: "var(--muted-foreground)",
                   }}
                 >
@@ -210,7 +279,6 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
               <div className="grid grid-cols-3 gap-1.5">
                 {MODE_NAMES.map((name) => {
                   const Icon = MODE_ICONS[MODE_ICONS_BY_NAME[name as ModeName]];
-                  const color = MODE_COLORS[name as ModeName];
                   const label = MODE_LABELS[name as ModeName];
                   const isActive = mode.name === name;
                   return (
@@ -227,20 +295,20 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                         alignItems: "center",
                         gap: "6px",
                         padding: "12px 6px 10px",
-                        borderRadius: "10px",
-                        background: isActive ? `${color}14` : "transparent",
+                        borderRadius: "var(--radius)",
+                        background: isActive ? "var(--foreground)" : "transparent",
                         border: isActive
-                          ? `0.5px solid ${color}55`
+                          ? "0.5px solid var(--foreground)"
                           : "0.5px solid var(--border)",
                         cursor: "pointer",
-                        transition: "background 0.15s, border-color 0.15s",
+                        transition: "background 0.15s, border-color 0.15s, color 0.15s",
                       }}
                     >
                       <Icon
                         size={18}
                         strokeWidth={isActive ? 2.25 : 1.85}
                         style={{
-                          color: isActive ? color : "var(--muted-foreground)",
+                          color: isActive ? "var(--background)" : "var(--muted-foreground)",
                           flexShrink: 0,
                         }}
                       />
@@ -249,7 +317,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                           fontFamily: "'Geist Variable', sans-serif",
                           fontSize: "11px",
                           fontWeight: isActive ? 600 : 500,
-                          color: isActive ? color : "var(--muted-foreground)",
+                          color: isActive ? "var(--background)" : "var(--muted-foreground)",
                           textAlign: "center",
                           lineHeight: 1.2,
                         }}
@@ -269,26 +337,27 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
         <div className="px-6 pt-4" style={{ flexShrink: 0 }}>
           <div
             role="status"
-            className="flex items-center gap-3 rounded-xl px-4 py-3"
+            className="flex items-center gap-3 px-4 py-3"
             style={{
               border: "0.5px solid var(--border)",
-              background: "color-mix(in oklab, var(--accent) 24%, transparent)",
+              borderRadius: "var(--radius)",
+              background: "var(--card)",
             }}
           >
             <div
               style={{
-                width: "28px",
-                height: "28px",
-                borderRadius: "999px",
-                background: "color-mix(in oklab, var(--primary) 16%, transparent)",
+                width: "26px",
+                height: "26px",
+                borderRadius: "var(--radius)",
+                background: "var(--accent)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
-                color: "var(--primary)",
+                color: "var(--foreground)",
               }}
             >
-              <LogIn size={14} strokeWidth={2.25} />
+              <LogIn size={13} strokeWidth={2.25} />
             </div>
             <div className="min-w-0 flex-1">
               <p
@@ -323,10 +392,10 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 fontSize: "12px",
                 fontWeight: 600,
                 color: "var(--primary-foreground)",
-                background: "var(--foreground)",
+                background: "var(--primary)",
                 border: "none",
-                borderRadius: "999px",
-                padding: "8px 16px",
+                borderRadius: "var(--radius)",
+                padding: "8px 14px",
                 cursor: "pointer",
                 flexShrink: 0,
                 transition: "opacity 0.15s",
@@ -342,332 +411,342 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
 
       {/* Scrollable content */}
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-        {/* Metrics grid — 4 cards */}
-        <div className="grid grid-cols-4 gap-3">
+        {/* Metrics — Linear-style horizontal list, hairline dividers */}
+        <div
+          style={{
+            border: "0.5px solid var(--border)",
+            borderRadius: "var(--radius)",
+            background: "var(--card)",
+            padding: "4px 16px",
+          }}
+        >
           {loading ? (
             Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} style={{ height: "78px" }} />
+              <div
+                key={i}
+                className="py-3.5"
+                style={{
+                  borderBottom:
+                    i === 3 ? "none" : "0.5px solid var(--border)",
+                }}
+              >
+                <Skeleton style={{ height: "22px", maxWidth: "240px" }} />
+              </div>
             ))
           ) : (
             <>
-              <MetricCard
+              <MetricRow
                 label="Words today"
                 value={metrics.wordsToday}
                 delta={metrics.wordsTodayDelta ?? undefined}
               />
-              <MetricCard
+              <MetricRow
                 label="Words / wk."
                 value={metrics.wordsWeek}
                 delta={metrics.wordsWeekDelta ?? undefined}
               />
-              <MetricCard
+              <MetricRow
                 label="Min / wk."
                 value={metrics.minutesWeek}
                 unit="min"
                 delta={metrics.minutesWeekDelta ?? undefined}
               />
-              <MetricCard
+              <MetricRow
                 label="Avg. speed"
                 value={metrics.velocityToday}
                 unit={metrics.velocityToday !== "--" ? "wpm" : ""}
                 delta={metrics.velocityTodayDelta ?? undefined}
+                isLast
               />
             </>
           )}
         </div>
 
-        {/* Recording area — calm, type-driven hero */}
-        <div className="mt-6">
-          <div
-            className="relative flex flex-col items-center justify-center overflow-hidden rounded-2xl"
-            style={{
-              minHeight: "280px",
-              padding: "32px 24px",
-              border: "0.5px solid var(--border)",
-              background: "color-mix(in oklab, var(--card) 60%, transparent)",
-            }}
-          >
-            <AnimatePresence mode="wait">
-              {status === "idle" && (
-                <motion.div
-                  key="idle"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.22 }}
-                  className="flex flex-col items-center gap-6"
+        {/* Push-to-talk hero — bare, type-driven, no card backdrop */}
+        <div className="mt-10 flex flex-col items-center gap-7 px-4 py-12">
+          <AnimatePresence mode="wait">
+            {status === "idle" && (
+              <motion.div
+                key="idle"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.22 }}
+                className="flex flex-col items-center gap-6"
+              >
+                <span
+                  className="tracking-widest"
+                  style={{
+                    fontFamily: "'Space Mono', monospace",
+                    fontSize: "10px",
+                    textTransform: "uppercase",
+                    color: "var(--muted-foreground)",
+                    fontWeight: 700,
+                  }}
                 >
+                  Push-to-talk
+                </span>
+
+                <div className="flex items-center gap-2">
+                  {hotkeyParts.map((k, i) => (
+                    <span key={`${k}-${i}`} className="flex items-center gap-2">
+                      <kbd
+                        className="tabular"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: "60px",
+                          height: "44px",
+                          padding: "0 16px",
+                          borderRadius: "var(--radius)",
+                          fontFamily: "'Space Mono', monospace",
+                          fontSize: "14px",
+                          fontWeight: 700,
+                          color: "var(--foreground)",
+                          background: "var(--card)",
+                          border: "0.5px solid var(--border)",
+                          letterSpacing: "0.02em",
+                        }}
+                      >
+                        {k}
+                      </kbd>
+                      {i < hotkeyParts.length - 1 && (
+                        <span
+                          style={{
+                            fontFamily: "'Space Mono', monospace",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            color: "var(--muted-foreground)",
+                          }}
+                        >
+                          +
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+
+                <p
+                  style={{
+                    fontFamily: "'Geist Variable', sans-serif",
+                    fontSize: "13.5px",
+                    fontWeight: 450,
+                    color: "var(--muted-foreground)",
+                    textAlign: "center",
+                    maxWidth: "440px",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  Hold the shortcut and talk in any app — release to transcribe.
+                </p>
+
+                <div
+                  aria-hidden
+                  style={{
+                    width: "40px",
+                    height: "0.5px",
+                    background: "var(--border)",
+                  }}
+                />
+
+                <div className="flex items-center gap-3">
                   <span
+                    className="tracking-widest"
                     style={{
                       fontFamily: "'Space Mono', monospace",
                       fontSize: "9.5px",
                       textTransform: "uppercase",
-                      letterSpacing: "0.22em",
                       color: "var(--muted-foreground)",
                       fontWeight: 700,
                     }}
                   >
-                    Push-to-talk
+                    Agent mode
                   </span>
+                  <ShortcutKbd keys={modeHotkeyParts} size="sm" />
+                </div>
+              </motion.div>
+            )}
 
-                  <div className="flex items-center gap-2">
-                    {hotkeyParts.map((k, i) => (
-                      <span key={`${k}-${i}`} className="flex items-center gap-2">
-                        <kbd
-                          className="tabular"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            minWidth: "64px",
-                            height: "52px",
-                            padding: "0 18px",
-                            borderRadius: "12px",
-                            fontFamily: "'Space Mono', monospace",
-                            fontSize: "16px",
-                            fontWeight: 700,
-                            color: "var(--foreground)",
-                            background: "var(--card)",
-                            border: "0.5px solid var(--border)",
-                            letterSpacing: "0.02em",
-                          }}
-                        >
-                          {k}
-                        </kbd>
-                        {i < hotkeyParts.length - 1 && (
-                          <span
-                            style={{
-                              fontFamily: "'Space Mono', monospace",
-                              fontSize: "16px",
-                              fontWeight: 500,
-                              color: "var(--muted-foreground)",
-                            }}
-                          >
-                            +
-                          </span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-
-                  <p
+            {status === "recording" && (
+              <motion.div
+                key="recording"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.22 }}
+                className="relative flex h-56 w-full items-center justify-center"
+              >
+                <Ripple
+                  mainCircleSize={110 + audioLevel * 80}
+                  mainCircleOpacity={0.12 + audioLevel * 0.3}
+                  numCircles={5}
+                />
+                <div className="relative z-10 flex flex-col items-center gap-3">
+                  <div
+                    className="flex items-center gap-2 px-3 py-1"
                     style={{
-                      fontFamily: "'Geist Variable', sans-serif",
-                      fontSize: "13.5px",
-                      fontWeight: 450,
-                      color: "var(--muted-foreground)",
-                      textAlign: "center",
-                      maxWidth: "420px",
-                      lineHeight: 1.55,
+                      background: "var(--card)",
+                      border: "0.5px solid var(--border)",
+                      borderRadius: "var(--radius)",
                     }}
                   >
-                    Hold the shortcut and talk in any app — release to transcribe.
-                  </p>
-
-                  <div
-                    aria-hidden
-                    style={{
-                      width: "60px",
-                      height: "0.5px",
-                      background: "var(--border)",
-                    }}
-                  />
-
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      style={{
-                        fontFamily: "'Space Mono', monospace",
-                        fontSize: "9.5px",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.16em",
-                        color: "var(--muted-foreground)",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Agent mode
-                    </span>
-                    <ShortcutKbd keys={modeHotkeyParts} size="sm" />
-                  </div>
-                </motion.div>
-              )}
-
-              {status === "recording" && (
-                <motion.div
-                  key="recording"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.22 }}
-                  className="relative flex h-64 w-full items-center justify-center"
-                >
-                  <Ripple
-                    mainCircleSize={110 + audioLevel * 80}
-                    mainCircleOpacity={0.18 + audioLevel * 0.4}
-                    numCircles={5}
-                  />
-                  <div className="relative z-10 flex flex-col items-center gap-3">
-                    <div
-                      className="flex items-center gap-2 rounded-full px-3 py-1"
-                      style={{
-                        background: "var(--card)",
-                        border: "0.5px solid var(--border)",
-                      }}
-                    >
-                      <span className="relative flex size-2">
-                        <span
-                          className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
-                          style={{ background: "var(--destructive)" }}
-                        />
-                        <span
-                          className="relative inline-flex size-2 rounded-full"
-                          style={{ background: "var(--destructive)" }}
-                        />
-                      </span>
+                    <span className="relative flex size-2">
                       <span
-                        style={{
-                          fontFamily: "'Geist Variable', sans-serif",
-                          fontSize: "12px",
-                          fontWeight: 500,
-                          color: "var(--foreground)",
-                        }}
-                      >
-                        Listening…
-                      </span>
-                    </div>
-                    <ShortcutKbd keys={hotkeyParts} />
-                    <p
+                        className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                        style={{ background: "var(--destructive)" }}
+                      />
+                      <span
+                        className="relative inline-flex size-2 rounded-full"
+                        style={{ background: "var(--destructive)" }}
+                      />
+                    </span>
+                    <span
                       style={{
-                        fontFamily: "'Space Mono', monospace",
-                        fontSize: "11px",
-                        color: "var(--muted-foreground)",
+                        fontFamily: "'Geist Variable', sans-serif",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        color: "var(--foreground)",
                       }}
                     >
-                      Release to transcribe
-                    </p>
+                      Listening…
+                    </span>
                   </div>
-                </motion.div>
-              )}
+                  <ShortcutKbd keys={hotkeyParts} />
+                  <p
+                    style={{
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: "11px",
+                      color: "var(--muted-foreground)",
+                    }}
+                  >
+                    Release to transcribe
+                  </p>
+                </div>
+              </motion.div>
+            )}
 
-              {status === "processing" && (
-                <motion.div
-                  key="processing"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                  className="flex flex-col items-center gap-3"
+            {status === "processing" && (
+              <motion.div
+                key="processing"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+                className="flex flex-col items-center gap-3"
+              >
+                <div className="flex gap-1.5">
+                  <span
+                    className="size-2 animate-bounce rounded-full [animation-delay:-0.3s]"
+                    style={{ background: "var(--foreground)" }}
+                  />
+                  <span
+                    className="size-2 animate-bounce rounded-full [animation-delay:-0.15s]"
+                    style={{ background: "var(--foreground)" }}
+                  />
+                  <span
+                    className="size-2 animate-bounce rounded-full"
+                    style={{ background: "var(--foreground)" }}
+                  />
+                </div>
+                <p
+                  style={{
+                    fontFamily: "'Geist Variable', sans-serif",
+                    fontSize: "14px",
+                    fontWeight: 500,
+                    color: "var(--muted-foreground)",
+                  }}
                 >
-                  <div className="flex gap-1.5">
-                    <span
-                      className="size-2 animate-bounce rounded-full [animation-delay:-0.3s]"
-                      style={{ background: "var(--primary)" }}
-                    />
-                    <span
-                      className="size-2 animate-bounce rounded-full [animation-delay:-0.15s]"
-                      style={{ background: "var(--primary)" }}
-                    />
-                    <span
-                      className="size-2 animate-bounce rounded-full"
-                      style={{ background: "var(--primary)" }}
-                    />
+                  Transcribing…
+                </p>
+              </motion.div>
+            )}
+
+            {status === "result" && resultText && (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.24 }}
+                className="w-full max-w-xl px-2"
+              >
+                <div
+                  className="relative overflow-hidden p-5"
+                  style={{
+                    background: "var(--card)",
+                    border: "0.5px solid var(--border)",
+                    borderRadius: "var(--radius)",
+                  }}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <ModeChip mode={mode} />
+                    <CopyButton text={resultText} variant="ghost" />
                   </div>
+                  <TextAnimate
+                    animation="blurInUp"
+                    by="word"
+                    duration={0.5}
+                    once
+                    startOnView={false}
+                    style={{
+                      fontFamily: "'Geist Variable', sans-serif",
+                      fontSize: "15px",
+                      fontWeight: 450,
+                      lineHeight: 1.6,
+                      color: "var(--foreground)",
+                    }}
+                  >
+                    {resultText}
+                  </TextAnimate>
+                </div>
+              </motion.div>
+            )}
+
+            {status === "error" && errorMessage && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="w-full max-w-md px-2"
+              >
+                <div
+                  className="p-4"
+                  style={{
+                    background:
+                      "color-mix(in oklab, var(--destructive) 10%, transparent)",
+                    border:
+                      "0.5px solid color-mix(in oklab, var(--destructive) 35%, transparent)",
+                    borderRadius: "var(--radius)",
+                  }}
+                >
                   <p
                     style={{
                       fontFamily: "'Geist Variable', sans-serif",
                       fontSize: "14px",
                       fontWeight: 500,
-                      color: "var(--muted-foreground)",
+                      color: "var(--destructive)",
                     }}
                   >
-                    Transcribing…
+                    {errorMessage}
                   </p>
-                </motion.div>
-              )}
-
-              {status === "result" && resultText && (
-                <motion.div
-                  key="result"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.24 }}
-                  className="w-full max-w-xl px-2"
-                >
-                  <div
-                    className="relative overflow-hidden rounded-2xl p-5"
-                    style={{
-                      background: "var(--card)",
-                      border: "0.5px solid var(--border)",
-                    }}
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <ModeChip mode={mode} />
-                      <CopyButton text={resultText} variant="ghost" />
-                    </div>
-                    <TextAnimate
-                      animation="blurInUp"
-                      by="word"
-                      duration={0.5}
-                      once
-                      startOnView={false}
-                      style={{
-                        fontFamily: "'Geist Variable', sans-serif",
-                        fontSize: "15px",
-                        fontWeight: 450,
-                        lineHeight: 1.6,
-                        color: "var(--foreground)",
-                      }}
-                    >
-                      {resultText}
-                    </TextAnimate>
-                  </div>
-                </motion.div>
-              )}
-
-              {status === "error" && errorMessage && (
-                <motion.div
-                  key="error"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className="w-full max-w-md px-2"
-                >
-                  <div
-                    className="rounded-2xl p-4"
-                    style={{
-                      background:
-                        "color-mix(in oklab, var(--destructive) 10%, transparent)",
-                      border:
-                        "0.5px solid color-mix(in oklab, var(--destructive) 35%, transparent)",
-                    }}
-                  >
-                    <p
-                      style={{
-                        fontFamily: "'Geist Variable', sans-serif",
-                        fontSize: "14px",
-                        fontWeight: 500,
-                        color: "var(--destructive)",
-                      }}
-                    >
-                      {errorMessage}
-                    </p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Recent history — slim rows, divided by hairlines */}
-        <div className="mt-6">
-          <div className="mb-3 flex items-center justify-between">
+        {/* Recent history — flat list, hairline dividers */}
+        <div className="mt-2">
+          <div className="mb-3 flex items-center justify-between px-1">
             <span
+              className="tracking-widest"
               style={{
                 fontFamily: "'Space Mono', monospace",
                 fontSize: "9px",
                 textTransform: "uppercase",
-                letterSpacing: "0.1em",
                 color: "var(--muted-foreground)",
               }}
             >
@@ -687,10 +766,8 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 cursor: "pointer",
                 transition: "color 0.15s",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--primary)")}
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "var(--muted-foreground)")
-              }
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--foreground)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--muted-foreground)")}
             >
               See all
               <ChevronRight size={12} strokeWidth={2.25} />
@@ -705,10 +782,11 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
             </div>
           ) : recentHistory.length === 0 ? (
             <div
-              className="rounded-2xl p-6 text-center"
+              className="p-6 text-center"
               style={{
                 border: "0.5px solid var(--border)",
-                background: "color-mix(in oklab, var(--card) 50%, transparent)",
+                borderRadius: "var(--radius)",
+                background: "var(--card)",
               }}
             >
               <p
@@ -724,17 +802,17 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
             </div>
           ) : (
             <div
-              className="rounded-2xl overflow-hidden"
+              className="overflow-hidden"
               style={{
                 border: "0.5px solid var(--border)",
-                background: "color-mix(in oklab, var(--card) 50%, transparent)",
+                borderRadius: "var(--radius)",
+                background: "var(--card)",
               }}
             >
               {recentHistory.map((item, i) => {
                 const Icon =
                   MODE_ICONS[MODE_ICONS_BY_NAME[item.mode_used as ModeName] ?? "Mic"] ??
                   MODE_ICONS.Mic;
-                const color = modeColor(item.mode_used);
                 const label = modeLabel(item.mode_used);
                 const text = item.processed_text || item.raw_text;
                 return (
@@ -742,17 +820,15 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     key={item.id}
                     className="group flex items-start gap-3 px-4 py-3"
                     style={{
-                      borderTop:
-                        i === 0 ? "none" : "0.5px solid var(--border)",
+                      borderTop: i === 0 ? "none" : "0.5px solid var(--border)",
                     }}
                   >
                     <div
                       style={{
-                        width: "26px",
-                        height: "26px",
-                        borderRadius: "8px",
-                        background: `${color}14`,
-                        border: `0.5px solid ${color}30`,
+                        width: "24px",
+                        height: "24px",
+                        borderRadius: "var(--radius)",
+                        background: "var(--accent)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -760,7 +836,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                         marginTop: "2px",
                       }}
                     >
-                      <Icon size={13} strokeWidth={2} style={{ color }} />
+                      <Icon size={12} strokeWidth={2} style={{ color: "var(--muted-foreground)" }} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="mb-0.5 flex items-center gap-2">

@@ -2,7 +2,6 @@ import { type ReactNode } from "react";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/Sidebar";
 import { TitleBar } from "@/components/TitleBar";
-import { Particles } from "@/components/Particles";
 import type { NavSection } from "@/lib/types";
 
 interface AppShellProps {
@@ -22,14 +21,6 @@ export function AppShell({ children, section, onSectionChange }: AppShellProps) 
         background: "var(--background)",
       }}
     >
-      <Particles
-        className="pointer-events-none absolute inset-0 z-0"
-        quantity={36}
-        color="#81B09A"
-        size={1.4}
-        opacity={0.22}
-      />
-
       <div
         style={{
           position: "relative",

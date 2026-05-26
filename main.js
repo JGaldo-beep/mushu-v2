@@ -18,6 +18,8 @@ import { execFile } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { uIOhook, UiohookKey } from "uiohook-napi";
 import WebSocket from "ws";
+import electronUpdaterPkg from "electron-updater";
+const { autoUpdater } = electronUpdaterPkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1735,9 +1737,42 @@ app.whenReady().then(async () => {
   updateTrayMenu = setupTray();
   registerIpc(updateTrayMenu);
   setHotkeys();
-  // TODO(auto-update): poll {apiBaseUrl}/api/releases/latest on launch
-  // and surface a "new version available" banner. Wire electron-updater
-  // or a manual fetch + dialog. Released installers live on GitHub.
+
+  // Auto-update via electron-updater + GitHub Releases.
+  // Only runs in the packaged production build — skipped during `npm run dev`.
+  if (!devServerUrl) {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on("checking-for-update", () => {
+      console.info("[updater] checking for updates");
+    });
+    autoUpdater.on("update-available", (info) => {
+      console.info("[updater] update available:", info?.version);
+      broadcast("update_available", { version: info?.version ?? null });
+    });
+    autoUpdater.on("update-not-available", () => {
+      console.info("[updater] up to date");
+    });
+    autoUpdater.on("download-progress", (progress) => {
+      console.info(
+        `[updater] downloading ${Math.round(progress?.percent ?? 0)}% ` +
+          `(${Math.round((progress?.bytesPerSecond ?? 0) / 1024)} KB/s)`,
+      );
+    });
+    autoUpdater.on("update-downloaded", (info) => {
+      console.info("[updater] update downloaded:", info?.version);
+      broadcast("update_downloaded", { version: info?.version ?? null });
+    });
+    autoUpdater.on("error", (error) => {
+      console.error("[updater] error:", error instanceof Error ? error.message : String(error));
+    });
+    autoUpdater.checkForUpdatesAndNotify().catch((error) => {
+      console.warn(
+        "[updater] checkForUpdatesAndNotify failed:",
+        error instanceof Error ? error.message : String(error),
+      );
+    });
+  }
 
   positionOverlay();
   overlayWindow.hide();

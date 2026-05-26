@@ -19,13 +19,13 @@ export const MODE_DESCRIPTIONS: Record<ModeName, string> = {
   NOTE: "Casual, bullets and fragments allowed.",
 };
 
-// Mode colors are sage-family variations so they sit cohesively next to the
-// canonical primary on both light and dark backgrounds. Picked from the
-// chart palette in src/index.css (chart-1, chart-3, chart-4).
+// Editorial monochrome: modes are differentiated by LABEL, not color.
+// All three dots resolve to mid-gray that reads on both light and dark.
+// Recording state shows the destructive red separately.
 export const MODE_COLORS: Record<ModeName, string> = {
-  DEFAULT: "#81B09A",
-  EMAIL: "#4E7561",
-  NOTE: "#B7CFB9",
+  DEFAULT: "#737373",
+  EMAIL: "#737373",
+  NOTE: "#737373",
 };
 
 export const MODE_ICONS_BY_NAME: Record<ModeName, ModeIconName> = {
@@ -65,5 +65,5 @@ export function modeLabel(name: string): string {
 /** Display color for any mode string. */
 export function modeColor(name: string): string {
   if (name in MODE_COLORS) return MODE_COLORS[name as ModeName];
-  return "#8A8278";
+  return "#737373";
 }
