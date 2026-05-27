@@ -10,7 +10,7 @@ export function useCaptureBridge() {
   useEffect(() => {
     const TARGET_SAMPLE_RATE = 16000;
     const WORKLET_CHUNK_SIZE = 1024;
-    const WORKLET_MODULE_URL = new URL("./linear16-capture.worklet.js", import.meta.url).toString();
+    const WORKLET_MODULE_URL = new URL("linear16-capture.worklet.js", document.baseURI).toString();
 
     const toLinear16 = (input: Float32Array, sourceSampleRate: number) => {
       const ratio = sourceSampleRate / TARGET_SAMPLE_RATE;

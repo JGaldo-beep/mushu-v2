@@ -369,6 +369,10 @@ async function handleMushuDeepLink(rawUrl) {
       token_type: session.token_type || "bearer",
     };
     accountCache = publicAccountFromSession(secrets.mushu_session, session.entitlement || null);
+    // Treat a deep-link sign-in as implicit onboarding completion: the user
+    // has already been through the website's sign-up/sign-in flow and clicked
+    // "Open my app", so the in-app wizard would just be friction.
+    settings.onboarding_completed = true;
     await persistState();
     await refreshAccountFromBackend().catch((error) => {
       console.warn("[auth] deep link refresh failed:", error instanceof Error ? error.message : String(error));

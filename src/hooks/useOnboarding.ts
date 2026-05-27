@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { listen } from "@/lib/events";
 import { tauri } from "@/lib/tauri";
 import type { FrontendState, MushuAccount } from "@/lib/types";
 
@@ -49,6 +50,33 @@ export function useOnboarding() {
       cancelled = true;
     };
   }, [loadTick]);
+
+  // Close the wizard if the backend marks onboarding as completed asynchronously
+  // (e.g. a `mushu://auth` deep link arrives after the renderer has already mounted).
+  useEffect(() => {
+    let off: (() => void) | null = null;
+    let cancelled = false;
+    void listen("frontend_state_changed", () => {
+      if (cancelled) return;
+      void tauri.getFrontendState().then((fs) => {
+        if (cancelled) return;
+        setSnapshot({
+          hotkey: fs.hotkey,
+          ptt_hotkey: fs.ptt_hotkey,
+          account: fs.account,
+          api_base_url: fs.api_base_url || "https://mushu.space",
+        });
+        if (parseOnboardingDone(fs)) setOpen(false);
+      });
+    }).then((u) => {
+      if (cancelled) u();
+      else off = u;
+    });
+    return () => {
+      cancelled = true;
+      if (off) off();
+    };
+  }, []);
 
   const refresh = useCallback(() => {
     setLoadTick((n) => n + 1);
