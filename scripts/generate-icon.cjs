@@ -6,7 +6,7 @@ const path = require("node:path");
 const sharp = require("sharp");
 const toIco = require("to-ico");
 
-const SOURCE = path.join(__dirname, "..", "public", "logo.svg");
+const SOURCE = path.join(__dirname, "..", "public", "mini-logo.svg");
 const ICO_OUT = path.join(__dirname, "..", "build", "icon.ico");
 const PNG_TRAY_OUT = path.join(__dirname, "..", "public", "mushu-icon.png");
 const PNG_LOGO_OUT = path.join(__dirname, "..", "public", "mushu-logo.png");

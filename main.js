@@ -1392,7 +1392,7 @@ function startRecording({ handsOffMode = false } = {}) {
       }
     } catch {}
   })();
-  broadcast("recording_started", currentMode);
+  broadcast("recording_started", { ...currentMode, selected_microphone: settings.selected_microphone ?? null });
   broadcast("hands_off_changed", handsOff);
   broadcast("dictation_paused", false);
   startAudioLevelEvents();

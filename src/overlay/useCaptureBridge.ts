@@ -48,12 +48,13 @@ export function useCaptureBridge() {
       streamRef.current = null;
     };
 
-    const startCapture = async () => {
+    const startCapture = async (deviceId: string | null = null) => {
       stopCapture();
-      console.info("[capture] starting microphone capture");
+      console.info("[capture] starting microphone capture", deviceId ? `device=${deviceId}` : "default");
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
@@ -134,8 +135,9 @@ export function useCaptureBridge() {
 
     const unsubs: Array<Promise<() => void>> = [];
     unsubs.push(
-      listen("recording_started", () => {
-        void startCapture().catch((error) => {
+      listen("recording_started", (event) => {
+        const deviceId = (event.payload as { selected_microphone?: string | null } | null)?.selected_microphone ?? null;
+        void startCapture(deviceId).catch((error) => {
           window.mushu.emitAudioChunk({
             error: error instanceof Error ? error.message : String(error),
             ts: Date.now(),

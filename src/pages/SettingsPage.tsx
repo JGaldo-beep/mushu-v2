@@ -1,12 +1,10 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ExternalLink,
   Eye,
   EyeOff,
   Globe,
   Info,
   Keyboard,
-  LifeBuoy,
   Mic,
   Plus,
   RefreshCw,
@@ -33,8 +31,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { useSpokenLanguage } from "@/hooks/useSpokenLanguage";
 import { tauri } from "@/lib/tauri";
 import type { DeepgramReplacement } from "@/lib/types";
-
-const APP_VERSION = "0.1.1";
+import { version as APP_VERSION } from "../../package.json";
 
 const LANGUAGES = [
   { value: "auto", label: "Auto-detect" },
@@ -414,28 +411,6 @@ export function SettingsPage() {
                   onChange={setLanguage}
                   className="w-56"
                 />
-              }
-            />
-            <SettingRow
-              label="Help"
-              description="Mushu docs and shortcuts."
-              control={
-                <a
-                  href="https://github.com/JGaldo-beep/mushu-v2"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="glass-btn inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5"
-                  style={{
-                    fontFamily: "'Geist Variable', sans-serif",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    textDecoration: "none",
-                  }}
-                >
-                  <LifeBuoy size={13} strokeWidth={2} />
-                  Open
-                  <ExternalLink size={11} strokeWidth={2} />
-                </a>
               }
             />
             <SettingRow
