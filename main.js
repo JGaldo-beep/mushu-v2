@@ -102,6 +102,7 @@ let uiohookStarted = false;
 let deepgramSocket = null;
 let deepgramSocketReady = false;
 let deepgramSocketFailed = false;
+let deepgramStreamClosedMidRecording = false;
 let deepgramFinalTranscript = "";
 let deepgramInterimTranscript = "";
 let deepgramStreamDone = null;
@@ -848,6 +849,7 @@ function resetDeepgramStreamState() {
   deepgramStreamSeconds = 0;
   deepgramStreamDone = null;
   deepgramSocketFailed = false;
+  deepgramStreamClosedMidRecording = false;
   broadcast("live_transcript", { text: "", isFinal: false });
 }
 
@@ -969,7 +971,14 @@ function startDeepgramDirectStream(apiKey) {
     }
   });
 
-  socket.on("close", () => { deepgramSocketReady = false; });
+  socket.on("close", () => {
+    deepgramSocketReady = false;
+    // Only flag premature close if this is still the active socket and no proxy fallback started
+    if (recording && deepgramSocket === socket && !deepgramStreamClosedMidRecording) {
+      deepgramStreamClosedMidRecording = true;
+      console.warn("[stt:direct] stream closed mid-recording — REST fallback will be used");
+    }
+  });
   socket.on("unexpected-response", (_request, response) => {
     deepgramSocketFailed = true;
     deepgramSocketReady = false;
@@ -990,6 +999,7 @@ function startDeepgramDirectStream(apiKey) {
           try {
             const { apiBaseUrl, accessToken } = await getBackendAuthContext();
             deepgramSocketFailed = false;
+            deepgramStreamClosedMidRecording = false;
             startDeepgramProxyStream(apiBaseUrl, accessToken);
           } catch (err) {
             deepgramSocketFailed = true;
@@ -1089,10 +1099,19 @@ function startDeepgramProxyStream(apiBaseUrl, accessToken) {
     }
   });
 
-  socket.on("close", () => { deepgramSocketReady = false; });
+  socket.on("close", () => {
+    deepgramSocketReady = false;
+    if (recording && deepgramSocket === socket) {
+      deepgramStreamClosedMidRecording = true;
+      console.warn("[stt:proxy] stream closed mid-recording — REST fallback will be used");
+    }
+  });
   socket.on("error", (error) => {
     deepgramSocketFailed = true;
     deepgramSocketReady = false;
+    if (recording && deepgramSocket === socket) {
+      deepgramStreamClosedMidRecording = true;
+    }
     console.warn("[stt:proxy] failed:", error instanceof Error ? error.message : String(error));
   });
 }
@@ -1103,11 +1122,13 @@ async function finishDeepgramStream() {
   if (!socket) return deepgramFinalTranscript.trim();
 
   const done = deepgramStreamDone;
-  // Hibrido: esperamos como mucho 400ms al final de Deepgram. Si no llega a tiempo,
-  // caemos al interim (ya bastante bueno por el streaming previo). Mejor latencia
-  // sin sacrificar mucha calidad porque el interim ya estaba refinandose en vivo.
+  // Wait up to 1200ms for the stream to close and deliver the final "done" message.
+  // The proxy server runs two Supabase calls in finishSession() before closing, which
+  // can take 400-800ms. Without enough wait time we'd miss the consolidated final
+  // transcript and fall back to the incrementally-accumulated one (which is correct
+  // but doesn't include the last unfinished utterance).
   await new Promise((resolve) => {
-    const timer = setTimeout(resolve, 400);
+    const timer = setTimeout(resolve, 1200);
     Promise.resolve(done).then(() => {
       clearTimeout(timer);
       resolve();
@@ -1139,7 +1160,10 @@ async function finishDeepgramStream() {
     deepgramSocket = null;
     deepgramSocketReady = false;
   }
-  const result = (deepgramFinalTranscript || deepgramInterimTranscript).trim();
+  const result = [deepgramFinalTranscript, deepgramInterimTranscript]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   const finishMs = Date.now() - finishStartedAt;
   console.info(
     `[stt:stream] finish took ${finishMs}ms — returns ${result.length} chars (final=${deepgramFinalTranscript.length} interim=${deepgramInterimTranscript.length})`,
@@ -1205,9 +1229,15 @@ async function processRecording() {
     console.info(
       `[recording] textChunks=${textChunks.length} audioChunks=${audioChunks.length} mime=${mimeType}`,
     );
+    // If the stream closed unexpectedly mid-recording, the accumulated transcript is
+    // partial. Skip it and fall through to the REST fallback which has the full audio.
+    const streamClosedEarly = deepgramStreamClosedMidRecording;
+    const streamText = settings.transcription_provider === "deepgram"
+      ? await finishDeepgramStream()
+      : "";
     const rawText =
       textChunks.join(" ").trim() ||
-      (settings.transcription_provider === "deepgram" ? await finishDeepgramStream() : "") ||
+      (streamClosedEarly ? "" : streamText) ||
       (await transcribeAudio(audioChunks, mimeType).catch((error) => {
         const providerLabel =
           settings.transcription_provider === "deepgram" ? "Deepgram" : "Groq";
