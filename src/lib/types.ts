@@ -81,7 +81,7 @@ export type SaveSettingsInput = {
   model: string;
   processing_mode: ProcessingMode;
   transcription_provider: TranscriptionProvider;
-  microphone: string | null;
+  selected_microphone: string | null;
   theme: ThemePref;
   sound_effects_enabled: boolean;
   sound_effects_volume: number;

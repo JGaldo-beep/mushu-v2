@@ -7,7 +7,6 @@ export function useCaptureBridge() {
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
-  const analyserFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     const TARGET_SAMPLE_RATE = 16000;
@@ -28,10 +27,6 @@ export function useCaptureBridge() {
     };
 
     const stopAnalyser = () => {
-      if (analyserFrameRef.current !== null) {
-        cancelAnimationFrame(analyserFrameRef.current);
-        analyserFrameRef.current = null;
-      }
       workletRef.current?.disconnect();
       workletRef.current = null;
       void audioContextRef.current?.close().catch(() => {});
@@ -83,9 +78,6 @@ export function useCaptureBridge() {
       const audioContext = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE });
       audioContextRef.current = audioContext;
       const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 512;
-      source.connect(analyser);
 
       await audioContext.audioWorklet.addModule(WORKLET_MODULE_URL);
       const worklet = new AudioWorkletNode(audioContext, "linear16-capture", {
@@ -99,6 +91,13 @@ export function useCaptureBridge() {
         const raw = event.data;
         const input = raw instanceof Float32Array ? raw : Float32Array.from(raw || []);
         if (input.length === 0) return;
+
+        // Compute RMS from each worklet block (~125 Hz at 16 kHz) for the waveform
+        let sum = 0;
+        for (const s of input) sum += s * s;
+        const rms = Math.sqrt(sum / input.length);
+        window.mushu.emitAudioChunk({ level: Math.min(1, rms * 5), ts: Date.now() });
+
         for (const value of input) pendingSamples.push(value);
         while (pendingSamples.length >= WORKLET_CHUNK_SIZE) {
           const chunk = Float32Array.from(pendingSamples.splice(0, WORKLET_CHUNK_SIZE));
@@ -114,23 +113,6 @@ export function useCaptureBridge() {
         }
       };
       source.connect(worklet);
-
-      const data = new Uint8Array(analyser.fftSize);
-      const tick = () => {
-        analyser.getByteTimeDomainData(data);
-        let sum = 0;
-        for (const sample of data) {
-          const centered = (sample - 128) / 128;
-          sum += centered * centered;
-        }
-        const rms = Math.sqrt(sum / data.length);
-        window.mushu.emitAudioChunk({
-          level: Math.min(1, rms * 5),
-          ts: Date.now(),
-        });
-        analyserFrameRef.current = requestAnimationFrame(tick);
-      };
-      tick();
     };
 
     const unsubs: Array<Promise<() => void>> = [];

@@ -50,7 +50,7 @@ export function useTheme() {
         model: state.model,
         processing_mode: state.processing_mode,
         transcription_provider: state.transcription_provider,
-        microphone: state.selected_microphone,
+        selected_microphone: state.selected_microphone,
         theme: next,
         sound_effects_enabled: state.sound_effects_enabled,
         sound_effects_volume: state.sound_effects_volume,
