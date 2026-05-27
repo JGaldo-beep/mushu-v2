@@ -1059,14 +1059,17 @@ function startDeepgramProxyStream(apiBaseUrl, accessToken) {
   });
 
   socket.on("message", (raw) => {
-    if (deepgramSocket !== socket) return;
     try {
       const data = JSON.parse(String(raw));
+      const isCurrent = deepgramSocket === socket;
       if (data.type === "ready") {
-        deepgramSocketReady = true;
+        if (isCurrent) deepgramSocketReady = true;
         return;
       }
       if (data.type === "transcript") {
+        // Stale-socket transcripts must be dropped — they could otherwise
+        // corrupt the next recording's accumulator.
+        if (!isCurrent) return;
         const transcript = String(data.transcript || "").trim();
         if (!transcript) return;
         if (data.isFinal) {
@@ -1083,11 +1086,15 @@ function startDeepgramProxyStream(apiBaseUrl, accessToken) {
         return;
       }
       if (data.type === "done") {
-        const transcript = String(data.transcript || "").trim();
-        if (transcript) {
-          deepgramFinalTranscript = transcript;
-          deepgramInterimTranscript = "";
-          emitLiveTranscript();
+        // Apply billing even from a released socket so usage stays accurate
+        // when finishDeepgramStream short-circuits before `done` arrives.
+        if (isCurrent) {
+          const transcript = String(data.transcript || "").trim();
+          if (transcript) {
+            deepgramFinalTranscript = transcript;
+            deepgramInterimTranscript = "";
+            emitLiveTranscript();
+          }
         }
         deepgramStreamSeconds = Number(data.seconds || 0);
         applyConsumedSecondsToAccount(deepgramStreamSeconds);
@@ -1096,7 +1103,7 @@ function startDeepgramProxyStream(apiBaseUrl, accessToken) {
         return;
       }
       if (data.type === "error") {
-        deepgramSocketFailed = true;
+        if (isCurrent) deepgramSocketFailed = true;
         broadcast("transcription_error", String(data.message || "Deepgram stream error."));
       }
     } catch (error) {
@@ -1127,44 +1134,62 @@ async function finishDeepgramStream() {
   if (!socket) return deepgramFinalTranscript.trim();
 
   const done = deepgramStreamDone;
-  // Wait up to 1200ms for the stream to close and deliver the final "done" message.
-  // The proxy server runs two Supabase calls in finishSession() before closing, which
-  // can take 400-800ms. Without enough wait time we'd miss the consolidated final
-  // transcript and fall back to the incrementally-accumulated one (which is correct
-  // but doesn't include the last unfinished utterance).
-  await new Promise((resolve) => {
-    const timer = setTimeout(resolve, 1200);
-    Promise.resolve(done).then(() => {
-      clearTimeout(timer);
-      resolve();
-    });
-    try {
-      const isDirect = Boolean(getDeepgramApiKey());
-      if (socket.readyState === WebSocket.OPEN) {
-        if (isDirect) {
-          socket.send(JSON.stringify({ type: "Finalize" }));
-        } else {
-          socket.send(JSON.stringify({ type: "close" }));
-        }
-      } else if (socket.readyState === WebSocket.CONNECTING && !isDirect) {
-        socket.once("open", () => socket.send(JSON.stringify({ type: "close" })));
-      }
-    } catch {
-      clearTimeout(timer);
-      resolve();
-    }
-  });
 
+  // Signal end-of-input so the server can flush its last `is_final` / `done`.
   try {
-    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-      socket.close();
+    const isDirect = Boolean(getDeepgramApiKey());
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(isDirect ? JSON.stringify({ type: "Finalize" }) : JSON.stringify({ type: "close" }));
+    } else if (socket.readyState === WebSocket.CONNECTING && !isDirect) {
+      socket.once("open", () => {
+        try { socket.send(JSON.stringify({ type: "close" })); } catch {}
+      });
     }
   } catch {}
 
+  // Return as soon as the transcript is stable (no pending interim) so the user
+  // sees pasted text immediately. We poll every 25ms after a 200ms grace that
+  // lets Deepgram flush its last `is_final` post-Finalize. The 1200ms cap is
+  // the worst case (slow proxy bookkeeping). The socket is released here but
+  // the proxy's late `done` message still applies billing — see the message
+  // handler in startDeepgramProxyStream.
+  const HARD_CAP_MS = 1200;
+  const GRACE_MS = 200;
+  const POLL_MS = 25;
+  const start = Date.now();
+  await new Promise((resolve) => {
+    let resolved = false;
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      resolve();
+    };
+    Promise.resolve(done).then(finish);
+    const tick = () => {
+      if (resolved) return;
+      const elapsed = Date.now() - start;
+      if (elapsed >= HARD_CAP_MS) return finish();
+      if (
+        elapsed >= GRACE_MS &&
+        deepgramFinalTranscript.length > 0 &&
+        deepgramInterimTranscript.length === 0
+      ) {
+        return finish();
+      }
+      setTimeout(tick, POLL_MS);
+    };
+    setTimeout(tick, POLL_MS);
+  });
+
+  // Release the reference so the next recording opens a fresh stream. We
+  // intentionally do NOT force-close: let the server send its `done` (and
+  // close the socket) so usage is recorded. If a new recording starts before
+  // that, startDeepgramStream's previousSocket cleanup will close it.
   if (deepgramSocket === socket) {
     deepgramSocket = null;
     deepgramSocketReady = false;
   }
+
   const result = [deepgramFinalTranscript, deepgramInterimTranscript]
     .filter(Boolean)
     .join(" ")
