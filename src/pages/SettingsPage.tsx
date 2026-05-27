@@ -493,6 +493,16 @@ export function SettingsPage() {
               }
             />
             <SettingRow
+              label="Stop recording on Enter"
+              description="Press Enter to finish dictating and insert the text."
+              control={
+                <GlassToggle
+                  value={draft?.stop_on_enter ?? false}
+                  onChange={(v) => setField("stop_on_enter", v)}
+                />
+              }
+            />
+            <SettingRow
               label="Volume"
               isLast
               control={

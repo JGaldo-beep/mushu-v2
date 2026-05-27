@@ -38,6 +38,7 @@ export type FrontendState = {
   theme: ThemePref;
   sound_effects_enabled: boolean;
   sound_effects_volume: number;
+  stop_on_enter: boolean;
   onboarding_completed: boolean;
   ai_formatting_enabled: boolean;
   auto_translate_enabled: boolean;
@@ -84,6 +85,7 @@ export type SaveSettingsInput = {
   theme: ThemePref;
   sound_effects_enabled: boolean;
   sound_effects_volume: number;
+  stop_on_enter?: boolean;
   ai_formatting_enabled?: boolean;
   auto_translate_enabled?: boolean;
   auto_translate_target?: string;

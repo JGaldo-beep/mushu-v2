@@ -64,6 +64,7 @@ const DEFAULT_SETTINGS = {
   theme: "system",
   sound_effects_enabled: true,
   sound_effects_volume: 0.22,
+  stop_on_enter: false,
   onboarding_completed: false,
   ai_formatting_enabled: true,
   auto_translate_enabled: false,
@@ -1396,6 +1397,14 @@ function startRecording({ handsOffMode = false } = {}) {
   broadcast("dictation_paused", false);
   startAudioLevelEvents();
   startDeepgramStream();
+  if (settings.stop_on_enter) {
+    try {
+      globalShortcut.unregister("Return");
+      globalShortcut.register("Return", () => { if (recording) stopRecording(); });
+    } catch {
+      console.warn("[hotkey] could not register Return key for stop-on-enter");
+    }
+  }
 }
 
 function stopRecording({ cancel = false } = {}) {
@@ -1406,6 +1415,7 @@ function stopRecording({ cancel = false } = {}) {
   primaryHotkeyDown = false;
   pttHotkeyDown = false;
   stopAudioLevelEvents();
+  try { globalShortcut.unregister("Return"); } catch {}
 
   if (cancel) {
     capturedChunks = [];

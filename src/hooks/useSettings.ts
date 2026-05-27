@@ -72,6 +72,7 @@ export function useSettings() {
         theme: fresh.theme,
         sound_effects_enabled: draft.sound_effects_enabled,
         sound_effects_volume: draft.sound_effects_volume,
+        stop_on_enter: draft.stop_on_enter ?? false,
         deepgram_replacements: draft.deepgram_replacements ?? [],
       };
       const updated = await tauri.saveSettings(input);
