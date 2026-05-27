@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { listen } from "@/lib/events";
+import WORKLET_MODULE_URL from "./linear16-capture.worklet.js?url";
 
 export function useCaptureBridge() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -11,7 +12,6 @@ export function useCaptureBridge() {
   useEffect(() => {
     const TARGET_SAMPLE_RATE = 16000;
     const WORKLET_CHUNK_SIZE = 1024;
-    const WORKLET_MODULE_URL = new URL("./linear16-capture.worklet.js", import.meta.url).toString();
 
     const toLinear16 = (input: Float32Array, sourceSampleRate: number) => {
       const ratio = sourceSampleRate / TARGET_SAMPLE_RATE;
