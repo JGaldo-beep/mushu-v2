@@ -1255,7 +1255,7 @@ async function processRecording() {
     const audioChunks = capturedChunks
       .filter((it) => it.bytes instanceof Uint8Array && !it.streamOnly)
       .map((it) => it.bytes);
-    const mimeType = capturedChunks.find((it) => it.mimeType)?.mimeType || "audio/webm";
+    const mimeType = capturedChunks.find((it) => it.mimeType && !it.streamOnly)?.mimeType || "audio/webm";
     console.info(
       `[recording] textChunks=${textChunks.length} audioChunks=${audioChunks.length} mime=${mimeType}`,
     );
