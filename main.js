@@ -5,6 +5,7 @@ import {
   globalShortcut,
   ipcMain,
   Menu,
+  powerMonitor,
   screen,
   session,
   shell,
@@ -1595,6 +1596,27 @@ function setHotkeys() {
   }
 }
 
+// After the OS suspends/resumes (lid close) or locks/unlocks, two things break:
+// (1) the low-level uIOhook native hook can stop delivering events, and
+// (2) any key held when sleep began never delivers its keyup, so flags like
+//     primaryHotkeyDown stay `true` — the next press hits the early-return guard
+//     and is silently swallowed, which is why it takes two presses to "wake up".
+// Fully stop the hook, clear the transient hold state, and re-register everything.
+function reestablishHotkeys() {
+  try {
+    if (uiohookStarted) {
+      uIOhook.stop();
+      uiohookStarted = false;
+    }
+  } catch {}
+  primaryHotkeyDown = false;
+  pttHotkeyDown = false;
+  syntheticCtrlSpaceActive = false;
+  if (!recording) handsOff = false;
+  setHotkeys();
+  console.info("[hotkeys] re-established after power/lock state change");
+}
+
 function registerIpc(updateTrayMenu) {
   ipcMain.handle("mushu:invoke", async (event, command, args = {}) => {
     const senderUrl = event.senderFrame?.url || "";
@@ -1826,6 +1848,10 @@ app.whenReady().then(async () => {
   updateTrayMenu = setupTray();
   registerIpc(updateTrayMenu);
   setHotkeys();
+
+  // Keep global hotkeys + the native hook alive across sleep/lock cycles.
+  powerMonitor.on("resume", reestablishHotkeys);
+  powerMonitor.on("unlock-screen", reestablishHotkeys);
 
   // Auto-update via electron-updater + GitHub Releases.
   // Only runs in the packaged production build — skipped during `npm run dev`.
