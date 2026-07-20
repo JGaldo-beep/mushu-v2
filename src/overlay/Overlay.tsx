@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Pause, Pin, Play } from "lucide-react";
 import { ModeBadge } from "@/overlay/components/ModeBadge";
+import { VoiceAgentBadge } from "@/overlay/components/VoiceAgentBadge";
 import { MushuReplyCard } from "@/overlay/components/MushuReplyCard";
 import { ThinkingDots } from "@/overlay/components/ThinkingDots";
 import { WaveBars } from "@/overlay/components/WaveBars";
@@ -16,6 +17,7 @@ export function Overlay() {
   useCaptureBridge();
   const {
     mode,
+    activeVoiceAgent,
     modeBannerOnly,
     mushuReplyText,
     modePopToken,
@@ -76,7 +78,15 @@ export function Overlay() {
                   )}
                 >
                   {!isProcessing && (
-                    <ModeBadge mode={mode} className="max-w-[min(100%,280px)]" key={modePopToken} />
+                    activeVoiceAgent ? (
+                      <VoiceAgentBadge
+                        name={activeVoiceAgent}
+                        className="max-w-[min(100%,280px)]"
+                        key={modePopToken}
+                      />
+                    ) : (
+                      <ModeBadge mode={mode} className="max-w-[min(100%,280px)]" key={modePopToken} />
+                    )
                   )}
                   {!modeBannerOnly && !isProcessing && liveTranscript && (
                     <motion.span

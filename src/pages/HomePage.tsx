@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronDown, ChevronRight, Copy, LogIn } from "lucide-react";
+import { Bot, Check, ChevronDown, ChevronRight, Copy, LogIn } from "lucide-react";
 import { useState } from "react";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { CopyButton } from "@/components/CopyButton";
@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useAudioLevel } from "@/hooks/useAudioLevel";
 import { useDictation } from "@/hooks/useDictation";
 import { useHomeMetrics } from "@/hooks/useHomeMetrics";
+import { useVoiceAgents } from "@/hooks/useVoiceAgents";
 import { Skeleton } from "@/components/Skeleton";
 import { useHistoryContext } from "@/context/HistoryContext";
 import { Ripple } from "@/components/ui/ripple";
@@ -82,6 +83,7 @@ type HomePageProps = {
 
 export function HomePage({ onNavigate }: HomePageProps = {}) {
   const { status, mode, hotkey, modeHotkey, resultText, errorMessage, setMode } = useDictation();
+  const { activeAgent } = useVoiceAgents();
   const [modeOpen, setModeOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const { items, loading } = useHistoryContext();
@@ -133,6 +135,32 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {activeAgent && (
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1.5"
+              title={activeAgent.instruction}
+              style={{
+                border: "0.5px solid var(--border)",
+                borderRadius: "var(--radius)",
+              }}
+            >
+              <Bot size={12} strokeWidth={2.25} style={{ color: "var(--muted-foreground)" }} />
+              <span
+                style={{
+                  fontFamily: "'Geist Variable', sans-serif",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  color: "var(--foreground)",
+                  maxWidth: "140px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {activeAgent.name}
+              </span>
+            </div>
+          )}
           <Popover open={modeOpen} onOpenChange={setModeOpen}>
             <PopoverTrigger asChild>
               <button

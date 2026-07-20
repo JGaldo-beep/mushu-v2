@@ -8,6 +8,16 @@ const MUSHU_REPLY_HIDE_MS = 20000;
 const TRANSCRIPTION_EXIT_MS = 220;
 const CHIME_GAIN_BOOST = 4;
 
+function voiceAgentName(agent: unknown): string | null {
+  const name = (agent as { name?: string } | null | undefined)?.name;
+  return typeof name === "string" && name.trim() ? name : null;
+}
+
+/** Extracts the embedded `active_voice_agent` field from recording_started/transcription_done payloads. */
+function embeddedVoiceAgentName(payload: unknown): string | null {
+  return voiceAgentName((payload as { active_voice_agent?: unknown } | null)?.active_voice_agent);
+}
+
 function parseModePayload(payload: unknown): ModeInfo {
   const p = payload as Partial<ModeInfo> & { name?: string };
   const raw = String(p?.name ?? "DEFAULT").toUpperCase();
@@ -86,6 +96,7 @@ export type OverlaySurface =
 export function useOverlayState() {
   const [surface, setSurface] = useState<OverlaySurface>("hidden");
   const [mode, setMode] = useState<ModeInfo>(DEFAULT_MODE);
+  const [activeVoiceAgent, setActiveVoiceAgent] = useState<string | null>(null);
   const [modeBannerOnly, setModeBannerOnly] = useState(false);
   const [mushuReplyText, setMushuReplyText] = useState<string | null>(null);
   const [modePopToken, setModePopToken] = useState(0);
@@ -163,8 +174,15 @@ export function useOverlayState() {
         setLiveTranscript("");
         const mode = parseModePayload(event.payload);
         setMode(mode);
+        setActiveVoiceAgent(embeddedVoiceAgentName(event.payload));
         setSurface("recording");
         playChime("start", soundEnabledRef.current, soundVolumeRef.current);
+      }),
+    );
+
+    unsubs.push(
+      listen("voice_agent_changed", (event) => {
+        setActiveVoiceAgent(voiceAgentName(event.payload));
       }),
     );
 
@@ -267,6 +285,7 @@ export function useOverlayState() {
         setLiveTranscript("");
         const payload = event.payload as { mode?: unknown } | undefined;
         if (payload?.mode) setMode(parseModePayload(payload.mode));
+        setActiveVoiceAgent(embeddedVoiceAgentName(event.payload));
         setTranscriptionFadeOut(true);
         cancelTranscriptionExit();
         transcriptionExitTimerRef.current = window.setTimeout(() => {
@@ -316,6 +335,7 @@ export function useOverlayState() {
   return {
     surface,
     mode,
+    activeVoiceAgent,
     modeBannerOnly,
     mushuReplyText,
     modePopToken,

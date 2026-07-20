@@ -12,6 +12,7 @@ import { AccountPage } from "@/pages/AccountPage";
 import { AIFeaturesPage } from "@/pages/AIFeaturesPage";
 import { HomePage } from "@/pages/HomePage";
 import { ModesPage } from "@/pages/ModesPage";
+import { VoiceAgentsPage } from "@/pages/VoiceAgentsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import type { NavSection } from "@/lib/types";
 
@@ -28,6 +29,7 @@ function App() {
             <PageTransition key={section}>
               {section === "home" && <HomePage onNavigate={setSection} />}
               {section === "modes" && <ModesPage />}
+              {section === "voice-agents" && <VoiceAgentsPage />}
               {section === "ai-features" && <AIFeaturesPage />}
               {section === "settings" && <SettingsPage />}
               {section === "account" && <AccountPage />}

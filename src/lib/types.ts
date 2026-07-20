@@ -17,6 +17,14 @@ export type TranscriptionProvider = "groq" | "deepgram";
 
 export type DeepgramReplacement = { from: string; to: string };
 
+export type VoiceAgent = {
+  id: string;
+  name: string;
+  instruction: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type FrontendState = {
   mode: ModeInfo;
   hotkey: string;
@@ -46,6 +54,8 @@ export type FrontendState = {
   deepgram_replacements: DeepgramReplacement[];
   spoken_language?: string;
   account: MushuAccount | null;
+  voice_agents: VoiceAgent[];
+  active_voice_agent_id: string | null;
 };
 
 export type MushuEntitlement = {
@@ -110,4 +120,4 @@ export type DictationLatencyPayload = {
   phase: string;
 };
 
-export type NavSection = "home" | "modes" | "ai-features" | "settings" | "account";
+export type NavSection = "home" | "modes" | "voice-agents" | "ai-features" | "settings" | "account";

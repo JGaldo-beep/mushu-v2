@@ -1,4 +1,4 @@
-import { Home, Settings, Sparkles, Wand2 } from "lucide-react";
+import { Bot, Home, Settings, Sparkles, Wand2 } from "lucide-react";
 import { LogoIcon } from "@/components/LogoIcon";
 import { NavUser } from "@/components/layout/NavUser";
 import {
@@ -18,6 +18,7 @@ import type { NavSection } from "@/lib/types";
 const NAV_ITEMS: { value: NavSection; icon: typeof Home; label: string }[] = [
   { value: "home", icon: Home, label: "Home" },
   { value: "modes", icon: Sparkles, label: "Modes" },
+  { value: "voice-agents", icon: Bot, label: "Voice Agents" },
   { value: "ai-features", icon: Wand2, label: "AI Features" },
   { value: "settings", icon: Settings, label: "Settings" },
 ];

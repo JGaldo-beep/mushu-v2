@@ -17,6 +17,7 @@ import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import { execFile } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import crypto from "node:crypto";
 import { uIOhook, UiohookKey } from "uiohook-napi";
 import WebSocket from "ws";
 import electronUpdaterPkg from "electron-updater";
@@ -72,6 +73,8 @@ const DEFAULT_SETTINGS = {
   auto_translate_target: "en",
   deepgram_replacements: [],
   spoken_language: "auto",
+  voice_agents: [],
+  active_voice_agent_id: null,
 };
 
 let mainWindow = null;
@@ -753,6 +756,10 @@ function stopAudioLevelEvents() {
   broadcast("audio_level", 0);
 }
 
+function getActiveVoiceAgent() {
+  return settings.voice_agents.find((a) => a.id === settings.active_voice_agent_id) || null;
+}
+
 async function transformText(rawText) {
   const text = String(rawText || "").trim();
   if (!text) return "";
@@ -1275,7 +1282,7 @@ async function processRecording() {
         throw new Error(groqErrorMessage(`${providerLabel} transcription`, error));
       }));
     if (!rawText) {
-      broadcast("transcription_done", { text: "", mode: currentMode });
+      broadcast("transcription_done", { text: "", mode: currentMode, active_voice_agent: getActiveVoiceAgent() });
       return;
     }
 
@@ -1333,9 +1340,48 @@ async function processRecording() {
       });
       historyStore = historyStore.slice(0, 200);
       await persistState();
-      broadcast("transcription_done", { text: output, mode: currentMode });
+      broadcast("transcription_done", { text: output, mode: currentMode, active_voice_agent: getActiveVoiceAgent() });
       await refreshAccountFromBackend().catch(() => {});
       broadcast("frontend_state_changed", {});
+      return;
+    }
+
+    const activeAgent = getActiveVoiceAgent();
+    if (activeAgent && accountCache) {
+      let output = "";
+      try {
+        const data = await callMushuJson("/api/agent", {
+          selectedText: rawText,
+          instruction: activeAgent.instruction,
+          mode: "agent",
+        });
+        output = String(data?.output || "").trim();
+        if (!output) throw new Error("Respuesta vacia del agente.");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("[voice-agent] failed:", message);
+        broadcast("groq_error", message);
+        broadcast("transcription_error", message);
+        broadcast("transcription_done", { text: "", mode: currentMode, active_voice_agent: activeAgent });
+        return;
+      }
+
+      clipboard.writeText(output);
+      await sleep(80);
+      await pasteClipboardToActiveApp().catch((error) => {
+        console.error("[voice-agent:paste] failed:", error instanceof Error ? error.message : String(error));
+      });
+      historyStore.unshift({
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        raw_text: rawText,
+        processed_text: output,
+        mode_used: `Agent: ${activeAgent.name}`,
+        duration_ms: Date.now() - recordingStartedAt,
+      });
+      historyStore = historyStore.slice(0, 200);
+      await persistState();
+      broadcast("transcription_done", { text: output, mode: currentMode, active_voice_agent: activeAgent });
       return;
     }
 
@@ -1377,7 +1423,7 @@ async function processRecording() {
     });
     historyStore = historyStore.slice(0, 200);
     await persistState();
-    broadcast("transcription_done", { text: transformed, mode: currentMode });
+    broadcast("transcription_done", { text: transformed, mode: currentMode, active_voice_agent: getActiveVoiceAgent() });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[recording] failed:", message);
@@ -1422,7 +1468,11 @@ function startRecording({ handsOffMode = false } = {}) {
       }
     } catch {}
   })();
-  broadcast("recording_started", { ...currentMode, selected_microphone: settings.selected_microphone ?? null });
+  broadcast("recording_started", {
+    ...currentMode,
+    selected_microphone: settings.selected_microphone ?? null,
+    active_voice_agent: getActiveVoiceAgent(),
+  });
   broadcast("hands_off_changed", handsOff);
   broadcast("dictation_paused", false);
   startAudioLevelEvents();
@@ -1697,6 +1747,44 @@ function registerIpc(updateTrayMenu) {
         broadcast("mode_switch_ok", currentMode);
         showOverlayBanner();
         return;
+      case "save_voice_agent": {
+        const input = args.input || {};
+        const name = String(input.name || "").trim();
+        const instruction = String(input.instruction || "").trim();
+        if (!name) throw new Error("El agente necesita un nombre.");
+        if (!instruction) throw new Error("El agente necesita una instrucción.");
+        const now = new Date().toISOString();
+        const id = String(input.id || "").trim();
+        const idx = id ? settings.voice_agents.findIndex((a) => a.id === id) : -1;
+        if (idx >= 0) {
+          settings.voice_agents[idx] = { ...settings.voice_agents[idx], name, instruction, updated_at: now };
+        } else {
+          settings.voice_agents = [
+            ...settings.voice_agents,
+            { id: crypto.randomUUID(), name, instruction, created_at: now, updated_at: now },
+          ];
+        }
+        await persistState();
+        broadcast("frontend_state_changed", {});
+        return getFrontendState();
+      }
+      case "delete_voice_agent": {
+        const id = String(args.id || "");
+        settings.voice_agents = settings.voice_agents.filter((a) => a.id !== id);
+        if (settings.active_voice_agent_id === id) settings.active_voice_agent_id = null;
+        await persistState();
+        broadcast("frontend_state_changed", {});
+        broadcast("voice_agent_changed", getActiveVoiceAgent());
+        return getFrontendState();
+      }
+      case "set_active_voice_agent": {
+        const id = args.id == null ? null : String(args.id);
+        settings.active_voice_agent_id = id && settings.voice_agents.some((a) => a.id === id) ? id : null;
+        await persistState();
+        broadcast("frontend_state_changed", {});
+        broadcast("voice_agent_changed", getActiveVoiceAgent());
+        return getFrontendState();
+      }
       case "window_minimize":
         mainWindow?.minimize();
         return;

@@ -23,4 +23,9 @@ export const tauri = {
   copyToClipboard: (text: string) => window.mushu.invoke<void>("copy_to_clipboard", { text }),
   openExternalUrl: (url: string) => window.mushu.invoke<void>("open_external_url", { url }),
   setMode: (mode: ModeName) => window.mushu.invoke<void>("set_mode", { mode }),
+  saveVoiceAgent: (input: { id?: string; name: string; instruction: string }) =>
+    window.mushu.invoke<FrontendState>("save_voice_agent", { input }),
+  deleteVoiceAgent: (id: string) => window.mushu.invoke<FrontendState>("delete_voice_agent", { id }),
+  setActiveVoiceAgent: (id: string | null) =>
+    window.mushu.invoke<FrontendState>("set_active_voice_agent", { id }),
 };
