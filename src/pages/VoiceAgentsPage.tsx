@@ -1,6 +1,7 @@
-import { Bot, Check, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, Check, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { GlassCard } from "@/components/GlassCard";
+import { tauri } from "@/lib/tauri";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,6 +33,7 @@ function AgentDialog({
   const [name, setName] = useState(agent?.name ?? "");
   const [instruction, setInstruction] = useState(agent?.instruction ?? "");
   const [saving, setSaving] = useState(false);
+  const [improving, setImproving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleOpenChange = (next: boolean) => {
@@ -41,6 +43,19 @@ function AgentDialog({
       setError(null);
     }
     onOpenChange(next);
+  };
+
+  const handleImprove = async () => {
+    setImproving(true);
+    setError(null);
+    try {
+      const improved = await tauri.improveVoiceAgentInstruction(instruction, name);
+      setInstruction(improved);
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setImproving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -77,7 +92,19 @@ function AgentDialog({
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Instruction</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">Instruction</label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={handleImprove}
+                disabled={improving || !instruction.trim()}
+              >
+                <Sparkles size={12} strokeWidth={2.25} />
+                {improving ? "Improving..." : "Improve with AI"}
+              </Button>
+            </div>
             <Textarea
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}

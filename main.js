@@ -1785,6 +1785,20 @@ function registerIpc(updateTrayMenu) {
         broadcast("voice_agent_changed", getActiveVoiceAgent());
         return getFrontendState();
       }
+      case "improve_voice_agent_instruction": {
+        const draft = String(args.text || "").trim();
+        if (!draft) throw new Error("Escribe una instrucción primero.");
+        const agentName = String(args.name || "").trim();
+        const metaInstruction = `You are helping a user write the instruction (system prompt) for a personal "voice agent". This agent rewrites a raw dictated idea into ready-to-paste text in a specific voice, tone, and format (e.g. a social media post for a given platform). The agent is named "${agentName || "Untitled"}". Improve and sharpen the following draft instruction: make it clear, specific, and actionable for an LLM, while preserving the user's intent (tone, platform, language, length, constraints). Return ONLY the improved instruction text, no preamble, no quotes, no markdown formatting.`;
+        const data = await callMushuJson("/api/agent", {
+          selectedText: draft,
+          instruction: metaInstruction,
+          mode: "agent",
+        });
+        const improved = String(data?.output || "").trim();
+        if (!improved) throw new Error("No se pudo mejorar la instrucción.");
+        return improved;
+      }
       case "window_minimize":
         mainWindow?.minimize();
         return;

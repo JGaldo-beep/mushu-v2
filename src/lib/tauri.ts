@@ -28,4 +28,6 @@ export const tauri = {
   deleteVoiceAgent: (id: string) => window.mushu.invoke<FrontendState>("delete_voice_agent", { id }),
   setActiveVoiceAgent: (id: string | null) =>
     window.mushu.invoke<FrontendState>("set_active_voice_agent", { id }),
+  improveVoiceAgentInstruction: (text: string, name?: string) =>
+    window.mushu.invoke<string>("improve_voice_agent_instruction", { text, name }),
 };
