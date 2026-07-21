@@ -1,7 +1,5 @@
 import { listen } from "@/lib/events";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DEFAULT_MODE, MODE_NAMES, normalizeMode } from "@/lib/modes";
-import type { ModeInfo, ModeName } from "@/lib/types";
 
 const THINK_AFTER_WAVE_MS = 260;
 const MUSHU_REPLY_HIDE_MS = 20000;
@@ -16,20 +14,6 @@ function voiceAgentName(agent: unknown): string | null {
 /** Extracts the embedded `active_voice_agent` field from recording_started/transcription_done payloads. */
 function embeddedVoiceAgentName(payload: unknown): string | null {
   return voiceAgentName((payload as { active_voice_agent?: unknown } | null)?.active_voice_agent);
-}
-
-function parseModePayload(payload: unknown): ModeInfo {
-  const p = payload as Partial<ModeInfo> & { name?: string };
-  const raw = String(p?.name ?? "DEFAULT").toUpperCase();
-  const name = (
-    MODE_NAMES.includes(raw as ModeName) ? raw : "DEFAULT"
-  ) as ModeName;
-  return normalizeMode({
-    name,
-    label: p?.label,
-    color: p?.color,
-    icon: p?.icon,
-  });
 }
 
 function chimeSrc(kind: "start" | "stop"): string {
@@ -95,10 +79,11 @@ export type OverlaySurface =
 
 export function useOverlayState() {
   const [surface, setSurface] = useState<OverlaySurface>("hidden");
-  const [mode, setMode] = useState<ModeInfo>(DEFAULT_MODE);
   const [activeVoiceAgent, setActiveVoiceAgent] = useState<string | null>(null);
   const [modeBannerOnly, setModeBannerOnly] = useState(false);
   const [mushuReplyText, setMushuReplyText] = useState<string | null>(null);
+  // Bumped whenever the active voice agent changes, forcing the overlay badge
+  // to re-key and replay its "pop" entrance animation.
   const [modePopToken, setModePopToken] = useState(0);
   const [showThinking, setShowThinking] = useState(false);
   const [transcriptionFadeOut, setTranscriptionFadeOut] = useState(false);
@@ -172,8 +157,6 @@ export function useOverlayState() {
         setIsHandsOff(false);
         setIsPaused(false);
         setLiveTranscript("");
-        const mode = parseModePayload(event.payload);
-        setMode(mode);
         setActiveVoiceAgent(embeddedVoiceAgentName(event.payload));
         setSurface("recording");
         playChime("start", soundEnabledRef.current, soundVolumeRef.current);
@@ -183,6 +166,7 @@ export function useOverlayState() {
     unsubs.push(
       listen("voice_agent_changed", (event) => {
         setActiveVoiceAgent(voiceAgentName(event.payload));
+        bumpModePop();
       }),
     );
 
@@ -217,21 +201,6 @@ export function useOverlayState() {
             return prev;
           });
         }
-      }),
-    );
-
-    unsubs.push(
-      listen("mode_changed", (event) => {
-        setMode(parseModePayload(event.payload));
-        bumpModePop();
-      }),
-    );
-
-    unsubs.push(
-      listen("mode_switch_ok", (event) => {
-        setMode(parseModePayload(event.payload));
-        bumpModePop();
-        setTranscriptionFadeOut(false);
       }),
     );
 
@@ -283,8 +252,6 @@ export function useOverlayState() {
         cancelMushuHide();
         setMushuReplyText(null);
         setLiveTranscript("");
-        const payload = event.payload as { mode?: unknown } | undefined;
-        if (payload?.mode) setMode(parseModePayload(payload.mode));
         setActiveVoiceAgent(embeddedVoiceAgentName(event.payload));
         setTranscriptionFadeOut(true);
         cancelTranscriptionExit();
@@ -334,7 +301,6 @@ export function useOverlayState() {
 
   return {
     surface,
-    mode,
     activeVoiceAgent,
     modeBannerOnly,
     mushuReplyText,

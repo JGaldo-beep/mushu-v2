@@ -34,12 +34,6 @@ app.setPath("userData", path.join(appDataPath, "MushuV2Electron"));
 app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
 app.commandLine.appendSwitch("disk-cache-size", "0");
 
-const MODE_MAP = {
-  DEFAULT: { name: "DEFAULT", label: "General", color: "#737373", icon: "Mic" },
-  EMAIL: { name: "EMAIL", label: "Email", color: "#737373", icon: "Mail" },
-  NOTE: { name: "NOTE", label: "Note", color: "#737373", icon: "StickyNote" },
-};
-
 // In dev, runtime assets live in public/. In production the renderer is built
 // by Vite which copies public/* to dist/*. Use this helper for any asset main.js
 // reads at runtime (tray icons, window icons, etc.) so we hit the right path
@@ -48,11 +42,13 @@ function resolveAssetPath(relPath) {
   const baseDir = devServerUrl ? "public" : "dist";
   return path.join(__dirname, baseDir, relPath);
 }
-const MODE_ORDER = ["DEFAULT", "EMAIL", "NOTE"];
 const HANDS_OFF_TAP_THRESHOLD_MS = 250;
 const DEFAULT_SETTINGS = {
   hotkey: "Ctrl+Space",
   ptt_hotkey: "Ctrl+Shift+Space",
+  // Historical names — these two hotkeys used to cycle Modes (General/Email/Note).
+  // They now cycle through Voice Agents instead; kept as-is to preserve existing
+  // user hotkey customizations and settings.json compatibility.
   mode_hotkey: "Ctrl+Shift+M",
   cycle_mode_hotkey: "Ctrl+Shift+,",
   pause_hotkey: "Ctrl+Shift+P",
@@ -68,7 +64,6 @@ const DEFAULT_SETTINGS = {
   sound_effects_volume: 0.22,
   stop_on_enter: false,
   onboarding_completed: false,
-  ai_formatting_enabled: true,
   auto_translate_enabled: false,
   auto_translate_target: "en",
   deepgram_replacements: [],
@@ -90,7 +85,6 @@ let historyStore = [];
 let recording = false;
 let paused = false;
 let handsOff = false;
-let currentMode = MODE_MAP.DEFAULT;
 let recordingStartedAt = 0;
 let audioLevelInterval = null;
 let capturedChunks = [];
@@ -146,7 +140,6 @@ function resolveDistPath(fileName) {
 function getFrontendState() {
   const deepgramApiKey = getDeepgramApiKey();
   return {
-    mode: currentMode,
     has_groq_key: Boolean(accountCache),
     has_deepgram_key: Boolean(deepgramApiKey || accountCache),
     has_deepgram_direct_key: Boolean(deepgramApiKey),
@@ -674,12 +667,13 @@ function setupTray() {
     mainWindow.focus();
   };
   const updateMenu = () => {
+    const activeAgent = getActiveVoiceAgent();
     const menu = Menu.buildFromTemplate([
-      { label: `Mode: ${currentMode.label}`, enabled: false },
+      { label: activeAgent ? `Agent: ${activeAgent.name}` : "Mode: General", enabled: false },
       { type: "separator" },
       { label: "Show Mushu", click: showMainWindow },
       { label: "Toggle Hands-off Dictation", click: () => toggleRecording() },
-      { label: "Cycle Mode", click: () => cycleMode() },
+      { label: "Cycle Voice Agent", click: () => cycleActiveVoiceAgent() },
       { label: "Quit", click: () => {
         isQuitting = true;
         app.quit();
@@ -758,24 +752,6 @@ function stopAudioLevelEvents() {
 
 function getActiveVoiceAgent() {
   return settings.voice_agents.find((a) => a.id === settings.active_voice_agent_id) || null;
-}
-
-async function transformText(rawText) {
-  const text = String(rawText || "").trim();
-  if (!text) return "";
-  if (currentMode.name === "DEFAULT") return text;
-
-  const instruction =
-    currentMode.name === "EMAIL"
-      ? "Reescribe el texto como correo profesional en espanol claro."
-      : "Reescribe el texto como nota corta con bullets cuando convenga.";
-
-  const data = await callMushuJson("/api/agent", {
-    selectedText: text,
-    instruction,
-    mode: currentMode.name === "EMAIL" ? "email" : "summarize",
-  });
-  return String(data?.output || "").trim() || text;
 }
 
 async function translateText(rawText, targetLanguage) {
@@ -1282,7 +1258,7 @@ async function processRecording() {
         throw new Error(groqErrorMessage(`${providerLabel} transcription`, error));
       }));
     if (!rawText) {
-      broadcast("transcription_done", { text: "", mode: currentMode, active_voice_agent: getActiveVoiceAgent() });
+      broadcast("transcription_done", { text: "", active_voice_agent: getActiveVoiceAgent() });
       return;
     }
 
@@ -1340,7 +1316,7 @@ async function processRecording() {
       });
       historyStore = historyStore.slice(0, 200);
       await persistState();
-      broadcast("transcription_done", { text: output, mode: currentMode, active_voice_agent: getActiveVoiceAgent() });
+      broadcast("transcription_done", { text: output, active_voice_agent: getActiveVoiceAgent() });
       await refreshAccountFromBackend().catch(() => {});
       broadcast("frontend_state_changed", {});
       return;
@@ -1362,7 +1338,7 @@ async function processRecording() {
         console.error("[voice-agent] failed:", message);
         broadcast("groq_error", message);
         broadcast("transcription_error", message);
-        broadcast("transcription_done", { text: "", mode: currentMode, active_voice_agent: activeAgent });
+        broadcast("transcription_done", { text: "", active_voice_agent: activeAgent });
         return;
       }
 
@@ -1381,30 +1357,18 @@ async function processRecording() {
       });
       historyStore = historyStore.slice(0, 200);
       await persistState();
-      broadcast("transcription_done", { text: output, mode: currentMode, active_voice_agent: activeAgent });
+      broadcast("transcription_done", { text: output, active_voice_agent: activeAgent });
       return;
     }
 
     let transformed = rawText;
     if (settings.auto_translate_enabled) {
-      // La traduccion produce texto ya limpio y bien puntuado, asi que
-      // sustituye al paso de AI Formatting cuando ambos estan activos.
       try {
         transformed = await translateText(rawText, settings.auto_translate_target);
       } catch (error) {
         const message = groqErrorMessage("Groq translation", error);
         console.error(message);
         broadcast("groq_error", message);
-        transformed = rawText;
-      }
-    } else if (settings.ai_formatting_enabled) {
-      try {
-        transformed = await transformText(rawText);
-      } catch (error) {
-        const message = groqErrorMessage("Groq formatting", error);
-        console.error(message);
-        broadcast("groq_error", message);
-        // Si ya hay transcripción, no bloqueamos el flujo: pegamos el texto crudo.
         transformed = rawText;
       }
     }
@@ -1418,12 +1382,12 @@ async function processRecording() {
       timestamp: new Date().toISOString(),
       raw_text: rawText,
       processed_text: transformed,
-      mode_used: currentMode.name,
+      mode_used: "DEFAULT",
       duration_ms: Date.now() - recordingStartedAt,
     });
     historyStore = historyStore.slice(0, 200);
     await persistState();
-    broadcast("transcription_done", { text: transformed, mode: currentMode, active_voice_agent: getActiveVoiceAgent() });
+    broadcast("transcription_done", { text: transformed, active_voice_agent: getActiveVoiceAgent() });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[recording] failed:", message);
@@ -1434,13 +1398,17 @@ async function processRecording() {
   }
 }
 
-function cycleMode() {
-  const idx = MODE_ORDER.indexOf(currentMode.name);
-  const next = MODE_ORDER[(idx + 1) % MODE_ORDER.length];
-  currentMode = MODE_MAP[next];
+async function cycleActiveVoiceAgent() {
+  const agents = settings.voice_agents;
+  const currentIdx = settings.active_voice_agent_id
+    ? agents.findIndex((a) => a.id === settings.active_voice_agent_id)
+    : -1;
+  const nextIdx = currentIdx + 1;
+  settings.active_voice_agent_id = nextIdx >= agents.length ? null : agents[nextIdx].id;
+  await persistState();
   updateTrayMenu?.();
-  broadcast("mode_changed", currentMode);
-  broadcast("mode_switch_ok", currentMode);
+  broadcast("frontend_state_changed", {});
+  broadcast("voice_agent_changed", getActiveVoiceAgent());
   showOverlayBanner();
 }
 
@@ -1469,7 +1437,6 @@ function startRecording({ handsOffMode = false } = {}) {
     } catch {}
   })();
   broadcast("recording_started", {
-    ...currentMode,
     selected_microphone: settings.selected_microphone ?? null,
     active_voice_agent: getActiveVoiceAgent(),
   });
@@ -1553,11 +1520,15 @@ function setHotkeys() {
   ) {
     console.error(`No se pudo registrar hotkey principal: ${hotkey}`);
   }
-  if (modeHotkey && !globalShortcut.register(modeHotkey, cycleMode)) {
-    console.error(`No se pudo registrar hotkey de modo: ${modeHotkey}`);
+  if (modeHotkey && !globalShortcut.register(modeHotkey, cycleActiveVoiceAgent)) {
+    console.error(`No se pudo registrar hotkey de agente de voz: ${modeHotkey}`);
   }
-  if (cycleModeHotkey && modeHotkey !== cycleModeHotkey && !globalShortcut.register(cycleModeHotkey, cycleMode)) {
-    console.error(`No se pudo registrar hotkey de ciclo de modo: ${cycleModeHotkey}`);
+  if (
+    cycleModeHotkey &&
+    modeHotkey !== cycleModeHotkey &&
+    !globalShortcut.register(cycleModeHotkey, cycleActiveVoiceAgent)
+  ) {
+    console.error(`No se pudo registrar hotkey de ciclo de agente de voz: ${cycleModeHotkey}`);
   }
   if (
     pauseHotkey &&
@@ -1740,13 +1711,6 @@ function registerIpc(updateTrayMenu) {
         await shell.openExternal(url);
         return;
       }
-      case "set_mode":
-        currentMode = MODE_MAP[String(args.mode || "DEFAULT")] || MODE_MAP.DEFAULT;
-        updateTrayMenu?.();
-        broadcast("mode_changed", currentMode);
-        broadcast("mode_switch_ok", currentMode);
-        showOverlayBanner();
-        return;
       case "save_voice_agent": {
         const input = args.input || {};
         const name = String(input.name || "").trim();

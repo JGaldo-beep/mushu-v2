@@ -1,8 +1,6 @@
 import { listen } from "@/lib/events";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DEFAULT_MODE, normalizeMode } from "@/lib/modes";
 import { tauri } from "@/lib/tauri";
-import type { ModeInfo, ModeName } from "@/lib/types";
 
 export type DictationStatus = "idle" | "recording" | "processing" | "result" | "error";
 
@@ -10,7 +8,6 @@ interface DictationState {
   status: DictationStatus;
   resultText: string | null;
   errorMessage: string | null;
-  mode: ModeInfo;
   hotkey: string;
   modeHotkey: string;
 }
@@ -18,14 +15,11 @@ interface DictationState {
 const RESULT_AUTO_CLEAR_MS = 12000;
 const ERROR_AUTO_CLEAR_MS = 6000;
 
-type ModePayload = Partial<ModeInfo> & { name?: ModeName };
-
 export function useDictation() {
   const [state, setState] = useState<DictationState>({
     status: "idle",
     resultText: null,
     errorMessage: null,
-    mode: DEFAULT_MODE,
     hotkey: "Ctrl+Space",
     modeHotkey: "Ctrl+Shift+M",
   });
@@ -46,7 +40,6 @@ export function useDictation() {
       .then((fs) => {
         setState((s) => ({
           ...s,
-          mode: normalizeMode(fs.mode),
           hotkey: fs.hotkey,
           modeHotkey: fs.mode_hotkey,
         }));
@@ -55,8 +48,7 @@ export function useDictation() {
   }, []);
 
   useEffect(() => {
-    const unlistenStart = listen("recording_started", (event) => {
-      const m = event.payload as ModePayload | null;
+    const unlistenStart = listen("recording_started", () => {
       if (clearTimerRef.current) {
         window.clearTimeout(clearTimerRef.current);
         clearTimerRef.current = null;
@@ -66,7 +58,6 @@ export function useDictation() {
         status: "recording",
         resultText: null,
         errorMessage: null,
-        mode: m?.name ? normalizeMode(m as ModeInfo) : s.mode,
       }));
     });
 
@@ -76,13 +67,12 @@ export function useDictation() {
     });
 
     const unlistenDone = listen("transcription_done", (event) => {
-      const p = event.payload as { text?: string; mode?: ModeInfo };
+      const p = event.payload as { text?: string };
       const hasText = !!p?.text;
       setState((s) => ({
         ...s,
         status: hasText ? "result" : "idle",
         resultText: p?.text ?? null,
-        mode: p?.mode?.name ? normalizeMode(p.mode) : s.mode,
       }));
       if (hasText) scheduleClear(RESULT_AUTO_CLEAR_MS);
     });
@@ -96,18 +86,6 @@ export function useDictation() {
         resultText: p?.text ?? null,
       }));
       if (hasText) scheduleClear(RESULT_AUTO_CLEAR_MS);
-    });
-
-    const unlistenModeChanged = listen("mode_changed", (event) => {
-      const m = event.payload as ModePayload;
-      if (!m?.name) return;
-      setState((s) => ({ ...s, mode: normalizeMode(m as ModeInfo) }));
-    });
-
-    const unlistenModeSwitch = listen("mode_switch_ok", (event) => {
-      const m = event.payload as ModePayload;
-      if (!m?.name) return;
-      setState((s) => ({ ...s, mode: normalizeMode(m as ModeInfo) }));
     });
 
     const unlistenError = listen("transcription_error", (event) => {
@@ -140,30 +118,12 @@ export function useDictation() {
       unlistenProcessing.then((f) => f());
       unlistenDone.then((f) => f());
       unlistenMushu.then((f) => f());
-      unlistenModeChanged.then((f) => f());
-      unlistenModeSwitch.then((f) => f());
       unlistenError.then((f) => f());
       unlistenGroq.then((f) => f());
       unlistenCancelled.then((f) => f());
       if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
     };
   }, [scheduleClear]);
-
-  const setMode = useCallback(async (name: ModeName) => {
-    const optimistic = normalizeMode({ name });
-    setState((s) => ({ ...s, mode: optimistic }));
-    try {
-      await tauri.setMode(name);
-    } catch (err) {
-      try {
-        const fs = await tauri.getFrontendState();
-        setState((s) => ({ ...s, mode: normalizeMode(fs.mode) }));
-      } catch {
-        /* ignore */
-      }
-      throw err;
-    }
-  }, []);
 
   const dismiss = useCallback(() => {
     if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
@@ -172,7 +132,6 @@ export function useDictation() {
 
   return {
     ...state,
-    setMode,
     dismiss,
   };
 }

@@ -16,13 +16,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useHistoryContext } from "@/context/HistoryContext";
-import {
-  MODE_ICONS,
-  MODE_ICONS_BY_NAME,
-  modeColor,
-  modeLabel,
-} from "@/lib/modes";
-import type { HistoryItem, ModeName } from "@/lib/types";
+import { HISTORY_BADGE_COLOR, historyIcon, historyLabel } from "@/lib/historyDisplay";
+import type { HistoryItem } from "@/lib/types";
 
 interface HistoryPageProps {
   /** When true, render inside a Sheet (no SidebarTrigger, no global topbar). */
@@ -81,7 +76,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
       (i) =>
         i.processed_text.toLowerCase().includes(q) ||
         i.raw_text.toLowerCase().includes(q) ||
-        modeLabel(i.mode_used).toLowerCase().includes(q),
+        historyLabel(i.mode_used).toLowerCase().includes(q),
     );
   }, [items, query]);
 
@@ -269,10 +264,9 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
 }
 
 function HistoryRow({ item }: { item: HistoryItem }) {
-  const Icon =
-    MODE_ICONS[MODE_ICONS_BY_NAME[item.mode_used as ModeName] ?? "Mic"] ?? MODE_ICONS.Mic;
-  const color = modeColor(item.mode_used);
-  const label = modeLabel(item.mode_used);
+  const Icon = historyIcon(item.mode_used);
+  const color = HISTORY_BADGE_COLOR;
+  const label = historyLabel(item.mode_used);
   const words = item.processed_text.split(/\s+/).filter(Boolean).length;
 
   return (

@@ -1,15 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Check, ChevronDown, ChevronRight, Copy, LogIn } from "lucide-react";
+import { Bot, Check, ChevronRight, Copy, LogIn } from "lucide-react";
 import { useState } from "react";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { CopyButton } from "@/components/CopyButton";
 import { tauri } from "@/lib/tauri";
 import { MetricCard } from "@/components/MetricCard";
-import { ModeChip } from "@/components/ModeChip";
 import { ShortcutKbd } from "@/components/ShortcutKbd";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { TextAnimate } from "@/components/ui/text-animate";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAudioLevel } from "@/hooks/useAudioLevel";
 import { useDictation } from "@/hooks/useDictation";
@@ -19,14 +17,8 @@ import { Skeleton } from "@/components/Skeleton";
 import { useHistoryContext } from "@/context/HistoryContext";
 import { Ripple } from "@/components/ui/ripple";
 import { HistoryPage } from "@/pages/HistoryPage";
-import {
-  MODE_ICONS,
-  MODE_ICONS_BY_NAME,
-  MODE_LABELS,
-  MODE_NAMES,
-  modeLabel,
-} from "@/lib/modes";
-import type { ModeName, NavSection } from "@/lib/types";
+import { historyIcon, historyLabel } from "@/lib/historyDisplay";
+import type { NavSection } from "@/lib/types";
 
 function RowCopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -82,9 +74,8 @@ type HomePageProps = {
 };
 
 export function HomePage({ onNavigate }: HomePageProps = {}) {
-  const { status, mode, hotkey, modeHotkey, resultText, errorMessage, setMode } = useDictation();
+  const { status, hotkey, modeHotkey, resultText, errorMessage } = useDictation();
   const { activeAgent } = useVoiceAgents();
-  const [modeOpen, setModeOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const { items, loading } = useHistoryContext();
   const { isSignedIn, loaded: accountLoaded } = useAccountStatus();
@@ -161,129 +152,6 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
               </span>
             </div>
           )}
-          <Popover open={modeOpen} onOpenChange={setModeOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="flex items-center gap-2 px-3 py-1.5"
-                style={{
-                  background: "transparent",
-                  border: "0.5px solid var(--border)",
-                  borderRadius: "var(--radius)",
-                  cursor: "pointer",
-                  transition: "background 0.15s, border-color 0.15s",
-                }}
-              >
-                <span
-                  className="animate-mode-pulse rounded-full"
-                  style={{
-                    width: "6px",
-                    height: "6px",
-                    background: "var(--muted-foreground)",
-                    flexShrink: 0,
-                    display: "block",
-                  }}
-                />
-                <span
-                  style={{
-                    fontFamily: "'Geist Variable', sans-serif",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    color: "var(--foreground)",
-                  }}
-                >
-                  {mode.label}
-                </span>
-                <ChevronDown
-                  size={11}
-                  strokeWidth={2.5}
-                  style={{
-                    color: "var(--muted-foreground)",
-                    transition: "transform 0.2s",
-                    transform: modeOpen ? "rotate(180deg)" : "rotate(0deg)",
-                  }}
-                />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              sideOffset={8}
-              style={{
-                background: "var(--popover)",
-                border: "0.5px solid var(--border)",
-                borderRadius: "var(--radius)",
-                padding: "14px",
-                width: "280px",
-              }}
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <span
-                  className="tracking-widest"
-                  style={{
-                    fontFamily: "'Space Mono', monospace",
-                    fontSize: "9px",
-                    textTransform: "uppercase",
-                    color: "var(--muted-foreground)",
-                  }}
-                >
-                  Dictation mode
-                </span>
-                <ShortcutKbd keys={modeHotkeyParts} size="sm" />
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {MODE_NAMES.map((name) => {
-                  const Icon = MODE_ICONS[MODE_ICONS_BY_NAME[name as ModeName]];
-                  const label = MODE_LABELS[name as ModeName];
-                  const isActive = mode.name === name;
-                  return (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => {
-                        setMode(name as ModeName).catch(() => {});
-                        setModeOpen(false);
-                      }}
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "12px 6px 10px",
-                        borderRadius: "var(--radius)",
-                        background: isActive ? "var(--foreground)" : "transparent",
-                        border: isActive
-                          ? "0.5px solid var(--foreground)"
-                          : "0.5px solid var(--border)",
-                        cursor: "pointer",
-                        transition: "background 0.15s, border-color 0.15s, color 0.15s",
-                      }}
-                    >
-                      <Icon
-                        size={18}
-                        strokeWidth={isActive ? 2.25 : 1.85}
-                        style={{
-                          color: isActive ? "var(--background)" : "var(--muted-foreground)",
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontFamily: "'Geist Variable', sans-serif",
-                          fontSize: "11px",
-                          fontWeight: isActive ? 600 : 500,
-                          color: isActive ? "var(--background)" : "var(--muted-foreground)",
-                          textAlign: "center",
-                          lineHeight: 1.2,
-                        }}
-                      >
-                        {label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </PopoverContent>
-          </Popover>
         </div>
       </div>
 
@@ -506,7 +374,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                       fontWeight: 700,
                     }}
                   >
-                    Agent mode
+                    Switch voice agent
                   </span>
                   <ShortcutKbd keys={modeHotkeyParts} size="sm" />
                 </div>
@@ -625,7 +493,16 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   }}
                 >
                   <div className="mb-3 flex items-center justify-between gap-2">
-                    <ModeChip mode={mode} />
+                    <span
+                      style={{
+                        fontFamily: "'Geist Variable', sans-serif",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "var(--muted-foreground)",
+                      }}
+                    >
+                      {activeAgent ? activeAgent.name : "General"}
+                    </span>
                     <CopyButton text={resultText} variant="ghost" />
                   </div>
                   <TextAnimate
@@ -755,10 +632,8 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
               }}
             >
               {recentHistory.map((item, i) => {
-                const Icon =
-                  MODE_ICONS[MODE_ICONS_BY_NAME[item.mode_used as ModeName] ?? "Mic"] ??
-                  MODE_ICONS.Mic;
-                const label = modeLabel(item.mode_used);
+                const Icon = historyIcon(item.mode_used);
+                const label = historyLabel(item.mode_used);
                 const text = item.processed_text || item.raw_text;
                 return (
                   <div

@@ -88,15 +88,18 @@ Two layers:
 
 `normalizeAccelerator()` converts `Ctrl+X` → `CommandOrControl+X` for Electron's format. `parseShortcutForHook()` converts to uIOhook keycodes. Both run in `setHotkeys()` which is called after every settings save.
 
-### Mode system
-Three modes: `DEFAULT` (raw dictation), `EMAIL` (AI-formatted as email), `NOTE` (AI-summarized). `cycleMode()` rotates through them. The current mode affects post-processing but not the transcription itself. Mode is stored in runtime variable `currentMode` (not persisted to disk).
+### Voice Agents
+There is no more Modes system (the old `DEFAULT`/`EMAIL`/`NOTE` enum, `ModesPage`, `cycleMode()` was removed). Dictation defaults to plain transcription ("General"). Users instead define **Voice Agents** — named presets (`{id, name, instruction, created_at, updated_at}`) stored in `settings.voice_agents` — each with a freeform instruction/system-prompt describing how to rewrite the dictated idea (e.g. "rewrite as an English X post, concise tone"). At most one agent is active at a time (`settings.active_voice_agent_id`, persisted — unlike the old mode, this survives restarts). Managed from the "Voice Agents" sidebar page (`src/pages/VoiceAgentsPage.tsx`, `src/hooks/useVoiceAgents.ts`) via dedicated IPC commands (`save_voice_agent`, `delete_voice_agent`, `set_active_voice_agent`) — deliberately *not* routed through the generic `save_settings` bag, to avoid the hand-picked-field footgun described above. `getActiveVoiceAgent()` derives the active agent from `settings` on demand (no separate runtime variable, so it can't drift from what's persisted).
+
+The `mode_hotkey`/`cycle_mode_hotkey` settings keys are kept (for settings.json/UI compatibility) but now cycle through voice agents — `General → Agent 1 → Agent 2 → ... → General` — via `cycleActiveVoiceAgent()`, not modes.
 
 ### Agent intercepts in `processRecording`
 After the transcript is finalized, `processRecording()` runs a chain of intercepts before falling through to normal text injection:
 1. **Selection agent** (`agentSelection && accountCache`) — calls the Mushu backend's `/api/agent` with the captured selection as context.
-2. Otherwise → translate/format → clipboard → paste.
+2. **Active voice agent** (`getActiveVoiceAgent() && accountCache`) — calls `/api/agent` with `instruction: activeAgent.instruction` and the dictated text as `selectedText`.
+3. Otherwise → auto-translate (if enabled) → clipboard → paste.
 
-**Invariant:** every early-return branch in `processRecording()` must still `broadcast("transcription_done", { text, mode: currentMode })` (use `try/finally`). The overlay listens for this event to reset from the "processing" state — skipping it leaves the pill stuck and visually breaks the next recording even though the audio pipeline still works.
+**Invariant:** every early-return branch in `processRecording()` must still `broadcast("transcription_done", { text, active_voice_agent })` (use `try/finally`). The overlay listens for this event to reset from the "processing" state — skipping it leaves the pill stuck and visually breaks the next recording even though the audio pipeline still works.
 
 ### WhatsApp agent (moved to `feat/whatsapp`)
 The voice-driven WhatsApp send feature lives on the `feat/whatsapp` branch. It includes `whatsapp-web.js` + puppeteer for the WhatsApp Web client, Anthropic Haiku for intent parsing, and a QR-pairing flow. Checkout `feat/whatsapp` to resume work on it. Do not re-add WhatsApp code to `main` without coordinating with the branch.

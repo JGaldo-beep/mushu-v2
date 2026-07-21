@@ -1,7 +1,16 @@
-import { Bot } from "lucide-react";
+import { Bot, Mic, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function VoiceAgentBadge({ name, className }: { name: string; className?: string }) {
+export function StatusBadge({
+  label,
+  isAgent,
+  className,
+}: {
+  label: string;
+  isAgent: boolean;
+  className?: string;
+}) {
+  const Icon: LucideIcon = isAgent ? Bot : Mic;
   return (
     <div
       className={cn(
@@ -14,12 +23,12 @@ export function VoiceAgentBadge({ name, className }: { name: string; className?:
         border: "1px solid rgba(255, 255, 255, 0.14)",
       }}
     >
-      <Bot
+      <Icon
         className="size-3.5 shrink-0"
         style={{ color: "rgba(255, 255, 255, 0.72)" }}
         strokeWidth={2.25}
       />
-      <span className="overlay-mode-chip-label truncate">{name}</span>
+      <span className="overlay-mode-chip-label truncate">{label}</span>
     </div>
   );
 }

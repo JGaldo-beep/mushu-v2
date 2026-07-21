@@ -1,14 +1,3 @@
-export type ModeName = "DEFAULT" | "EMAIL" | "NOTE";
-
-export type ModeIconName = "Mic" | "Mail" | "StickyNote";
-
-export type ModeInfo = {
-  name: ModeName;
-  label: string;
-  color: string;
-  icon: ModeIconName;
-};
-
 export type ThemePref = "system" | "light" | "dark";
 
 export type ProcessingMode = "cloud_first" | "local_only";
@@ -26,7 +15,6 @@ export type VoiceAgent = {
 };
 
 export type FrontendState = {
-  mode: ModeInfo;
   hotkey: string;
   ptt_hotkey: string;
   mode_hotkey: string;
@@ -48,7 +36,6 @@ export type FrontendState = {
   sound_effects_volume: number;
   stop_on_enter: boolean;
   onboarding_completed: boolean;
-  ai_formatting_enabled: boolean;
   auto_translate_enabled: boolean;
   auto_translate_target: string;
   deepgram_replacements: DeepgramReplacement[];
@@ -96,7 +83,6 @@ export type SaveSettingsInput = {
   sound_effects_enabled: boolean;
   sound_effects_volume: number;
   stop_on_enter?: boolean;
-  ai_formatting_enabled?: boolean;
   auto_translate_enabled?: boolean;
   auto_translate_target?: string;
   deepgram_replacements?: DeepgramReplacement[];
@@ -108,7 +94,7 @@ export type HistoryItem = {
   timestamp: string;
   raw_text: string;
   processed_text: string;
-  mode_used: ModeName | string;
+  mode_used: string;
   duration_ms: number;
 };
 
@@ -120,4 +106,4 @@ export type DictationLatencyPayload = {
   phase: string;
 };
 
-export type NavSection = "home" | "modes" | "voice-agents" | "ai-features" | "settings" | "account";
+export type NavSection = "home" | "voice-agents" | "ai-features" | "settings" | "account";

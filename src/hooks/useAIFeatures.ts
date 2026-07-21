@@ -3,30 +3,25 @@ import { listen } from "@/lib/events";
 import { tauri } from "@/lib/tauri";
 
 export interface AIFeaturesState {
-  formattingEnabled: boolean;
   autoTranslateEnabled: boolean;
   autoTranslateTarget: string;
 }
 
 const DEFAULT_STATE: AIFeaturesState = {
-  formattingEnabled: true,
   autoTranslateEnabled: false,
   autoTranslateTarget: "en",
 };
 
 const SETTINGS_KEY: Record<keyof AIFeaturesState, string> = {
-  formattingEnabled: "ai_formatting_enabled",
   autoTranslateEnabled: "auto_translate_enabled",
   autoTranslateTarget: "auto_translate_target",
 };
 
 function fromState(s: {
-  ai_formatting_enabled?: boolean;
   auto_translate_enabled?: boolean;
   auto_translate_target?: string;
 }): AIFeaturesState {
   return {
-    formattingEnabled: s.ai_formatting_enabled ?? true,
     autoTranslateEnabled: s.auto_translate_enabled ?? false,
     autoTranslateTarget: s.auto_translate_target ?? "en",
   };

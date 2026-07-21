@@ -36,15 +36,6 @@ function AgentDialog({
   const [improving, setImproving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleOpenChange = (next: boolean) => {
-    if (next) {
-      setName(agent?.name ?? "");
-      setInstruction(agent?.instruction ?? "");
-      setError(null);
-    }
-    onOpenChange(next);
-  };
-
   const handleImprove = async () => {
     setImproving(true);
     setError(null);
@@ -72,7 +63,7 @@ function AgentDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{agent ? "Edit voice agent" : "New voice agent"}</DialogTitle>
@@ -135,15 +126,21 @@ export function VoiceAgentsPage() {
   const { agents, activeAgentId, saveAgent, deleteAgent, setActiveAgent } = useVoiceAgents();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<VoiceAgent | null>(null);
+  // Bumped on every open so AgentDialog fully remounts and its local form
+  // state (useState initializers) picks up the current `agent` prop fresh,
+  // instead of reusing stale state from a previous open of the dialog.
+  const [dialogSession, setDialogSession] = useState(0);
 
   const openCreate = () => {
     setEditingAgent(null);
+    setDialogSession((n) => n + 1);
     setDialogOpen(true);
   };
 
   const openEdit = (agent: VoiceAgent, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingAgent(agent);
+    setDialogSession((n) => n + 1);
     setDialogOpen(true);
   };
 
@@ -358,6 +355,7 @@ export function VoiceAgentsPage() {
       </div>
 
       <AgentDialog
+        key={dialogSession}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         agent={editingAgent}

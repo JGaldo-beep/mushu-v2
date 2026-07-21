@@ -722,8 +722,8 @@ export function SettingsPage() {
               }
             />
             <SettingRow
-              label="Switch mode"
-              description="Cycle General, Email, and Note without opening the app."
+              label="Switch voice agent"
+              description="Cycle through General and your Voice Agents without opening the app."
               control={
                 <HotkeyCapture
                   value={draft?.mode_hotkey ?? ""}

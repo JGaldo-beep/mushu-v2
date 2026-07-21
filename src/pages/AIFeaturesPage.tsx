@@ -1,4 +1,4 @@
-import { Languages, Sparkles, Wand2 } from "lucide-react";
+import { Languages, Sparkles } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { GlassCard } from "@/components/GlassCard";
@@ -67,15 +67,6 @@ export function AIFeaturesPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         <div className="flex flex-col gap-3">
-          <FeatureCard
-            icon={Wand2}
-            color="#0A0A0A"
-            title="AI Formatting"
-            description="Refines grammar and punctuation before pasting."
-            value={ai.formattingEnabled}
-            onChange={(v) => ai.setField("formattingEnabled", v)}
-          />
-
           <InfoCard
             icon={Sparkles}
             color="#525252"

@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Pause, Pin, Play } from "lucide-react";
-import { ModeBadge } from "@/overlay/components/ModeBadge";
-import { VoiceAgentBadge } from "@/overlay/components/VoiceAgentBadge";
+import { StatusBadge } from "@/overlay/components/StatusBadge";
 import { MushuReplyCard } from "@/overlay/components/MushuReplyCard";
 import { ThinkingDots } from "@/overlay/components/ThinkingDots";
 import { WaveBars } from "@/overlay/components/WaveBars";
@@ -16,7 +15,6 @@ const transition = { duration: 0.22, ease } as const;
 export function Overlay() {
   useCaptureBridge();
   const {
-    mode,
     activeVoiceAgent,
     modeBannerOnly,
     mushuReplyText,
@@ -78,15 +76,12 @@ export function Overlay() {
                   )}
                 >
                   {!isProcessing && (
-                    activeVoiceAgent ? (
-                      <VoiceAgentBadge
-                        name={activeVoiceAgent}
-                        className="max-w-[min(100%,280px)]"
-                        key={modePopToken}
-                      />
-                    ) : (
-                      <ModeBadge mode={mode} className="max-w-[min(100%,280px)]" key={modePopToken} />
-                    )
+                    <StatusBadge
+                      label={activeVoiceAgent ?? "General"}
+                      isAgent={!!activeVoiceAgent}
+                      className="max-w-[min(100%,280px)]"
+                      key={modePopToken}
+                    />
                   )}
                   {!modeBannerOnly && !isProcessing && liveTranscript && (
                     <motion.span
@@ -144,7 +139,7 @@ export function Overlay() {
                               exit={{ opacity: 0, scale: 0.7 }}
                               transition={transition}
                               title="Hands-off activo — toca el atajo para detener"
-                              style={{ color: mode.color, lineHeight: 0 }}
+                              style={{ color: "#737373", lineHeight: 0 }}
                             >
                               <Pin size={12} strokeWidth={2.5} />
                             </motion.span>
