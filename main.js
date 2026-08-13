@@ -106,6 +106,12 @@ let deepgramFinalTranscript = "";
 let deepgramInterimTranscript = "";
 let deepgramStreamDone = null;
 let deepgramStreamSeconds = 0;
+// Timings del arranque del stream. Cada tramo (auth → socket abierto → primer
+// transcript) se loggea relativo a sttStartedAt para poder ver, cuando un dictado
+// falla, cuál de ellos se pasó de tiempo.
+let sttStartedAt = 0;
+let sttFirstTranscriptLogged = false;
+let authWarmInterval = null;
 let accountCache = null;
 let pendingDeepLinkUrl = null;
 let isQuitting = false;
@@ -198,16 +204,40 @@ function sendCopyToActiveApp() {
   );
 }
 
-async function getForegroundWindowHandle() {
-  if (process.platform !== "win32") return null;
+// Window classes where Ctrl+C means "kill the running process", not "copy". Sending the
+// selection-capture keystroke into one of these terminates whatever is running there —
+// including `npm run dev` while testing Mushu itself.
+const CONSOLE_WINDOW_CLASSES = new Set([
+  "ConsoleWindowClass", // conhost / cmd.exe
+  "CASCADIA_HOSTING_WINDOW_CLASS", // Windows Terminal
+  "mintty", // Git Bash
+  "PuTTY",
+  "VirtualConsoleClass", // ConEmu
+]);
+
+async function getForegroundWindowInfo() {
+  if (process.platform !== "win32") return { handle: null, className: "" };
   try {
-    const out = await execPowerShell(
-      `$sig='[DllImport("user32.dll")] public static extern System.IntPtr GetForegroundWindow();'; Add-Type -MemberDefinition $sig -Namespace W -Name P; [W.P]::GetForegroundWindow().ToInt64()`,
-    );
-    const n = Number(out);
-    return Number.isFinite(n) && n > 0 ? n : null;
+    const script = [
+      "$sig = @'",
+      '[DllImport("user32.dll")] public static extern System.IntPtr GetForegroundWindow();',
+      '[DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(System.IntPtr hWnd, System.Text.StringBuilder buf, int max);',
+      "'@",
+      "Add-Type -MemberDefinition $sig -Namespace W -Name P -UsingNamespace System.Text",
+      "$h = [W.P]::GetForegroundWindow()",
+      "$sb = New-Object System.Text.StringBuilder 256",
+      "[W.P]::GetClassName($h, $sb, 256) | Out-Null",
+      '"$($h.ToInt64())|$($sb.ToString())"',
+    ].join("\n");
+    const out = await execPowerShell(script);
+    const [rawHandle, ...rest] = String(out).trim().split("|");
+    const n = Number(rawHandle);
+    return {
+      handle: Number.isFinite(n) && n > 0 ? n : null,
+      className: rest.join("|").trim(),
+    };
   } catch {
-    return null;
+    return { handle: null, className: "" };
   }
 }
 
@@ -435,14 +465,48 @@ async function refreshSupabaseSession() {
   return refreshed;
 }
 
+// Refreshed well before expiry (5 min, not 1) so the background warmer below always
+// wins the race against a recording. A refresh triggered from startDeepgramStream()
+// costs a full Supabase round trip while the user is already talking.
+const SESSION_REFRESH_MARGIN_MS = 5 * 60_000;
+
 async function getValidSession() {
   const session = secrets.mushu_session;
   if (!session?.access_token) return null;
   const expiresAtMs = Number(session.expires_at || 0) * 1000;
-  if (expiresAtMs && Date.now() > expiresAtMs - 60_000) {
+  if (expiresAtMs && Date.now() > expiresAtMs - SESSION_REFRESH_MARGIN_MS) {
     return refreshSupabaseSession();
   }
   return session;
+}
+
+// Keeps the access token fresh, and the DNS entry + TLS session ticket for the stream
+// host warm, so pressing the hotkey opens the WebSocket with zero network work first.
+async function warmBackendConnection() {
+  try {
+    await getValidSession();
+  } catch (error) {
+    console.warn("[warm] token refresh failed:", error instanceof Error ? error.message : String(error));
+  }
+
+  try {
+    const { apiBaseUrl } = requireAuthConfig();
+    const streamUrl = new URL(resolveMushuStreamUrl(apiBaseUrl));
+    streamUrl.protocol = streamUrl.protocol === "wss:" ? "https:" : "http:";
+    streamUrl.pathname = "/";
+    streamUrl.search = "";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      await fetch(streamUrl.toString(), { method: "HEAD", signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== "AbortError") {
+      console.warn("[warm] stream host ping failed:", error instanceof Error ? error.message : String(error));
+    }
+  }
 }
 
 async function refreshAccountFromBackend() {
@@ -839,7 +903,12 @@ function resetDeepgramStreamState() {
   deepgramStreamDone = null;
   deepgramSocketFailed = false;
   deepgramStreamClosedMidRecording = false;
+  sttFirstTranscriptLogged = false;
   broadcast("live_transcript", { text: "", isFinal: false });
+}
+
+function sttElapsed() {
+  return sttStartedAt ? Date.now() - sttStartedAt : 0;
 }
 
 function isDeepgramDirectChunk(chunk) {
@@ -872,6 +941,7 @@ function startDeepgramStream() {
     return;
   }
 
+  sttStartedAt = Date.now();
   void (async () => {
     try {
       const apiKey = getDeepgramApiKey();
@@ -879,6 +949,7 @@ function startDeepgramStream() {
         startDeepgramDirectStream(apiKey);
       } else {
         const { apiBaseUrl, accessToken } = await getBackendAuthContext();
+        console.info(`[stt] auth listo +${sttElapsed()}ms`);
         startDeepgramProxyStream(apiBaseUrl, accessToken);
       }
     } catch (error) {
@@ -930,11 +1001,18 @@ function startDeepgramDirectStream(apiKey) {
 
   socket.on("open", () => {
     deepgramSocketReady = true;
+    let flushed = 0;
+    let flushedBytes = 0;
     for (const chunk of capturedChunks) {
       if (isDeepgramDirectChunk(chunk) && socket.readyState === WebSocket.OPEN) {
         socket.send(chunk.bytes);
+        flushed += 1;
+        flushedBytes += chunk.bytes.length;
       }
     }
+    console.info(
+      `[stt:direct] socket abierto +${sttElapsed()}ms — volcando ${flushed} chunks / ${flushedBytes} bytes`,
+    );
   });
 
   socket.on("message", (raw) => {
@@ -944,6 +1022,10 @@ function startDeepgramDirectStream(apiKey) {
       if (data.type !== "Results") return;
       const transcript = (data.channel?.alternatives?.[0]?.transcript || "").trim();
       if (!transcript) return;
+      if (!sttFirstTranscriptLogged) {
+        sttFirstTranscriptLogged = true;
+        console.info(`[stt:direct] primer transcript +${sttElapsed()}ms`);
+      }
       if (data.is_final) {
         deepgramFinalTranscript = [deepgramFinalTranscript, transcript]
           .filter(Boolean)
@@ -1035,11 +1117,18 @@ function startDeepgramProxyStream(apiBaseUrl, accessToken) {
 
   socket.on("open", () => {
     deepgramSocketReady = true;
+    let flushed = 0;
+    let flushedBytes = 0;
     for (const chunk of capturedChunks) {
       if (isDeepgramProxyChunk(chunk) && socket.readyState === WebSocket.OPEN) {
         socket.send(chunk.bytes);
+        flushed += 1;
+        flushedBytes += chunk.bytes.length;
       }
     }
+    console.info(
+      `[stt:proxy] socket abierto +${sttElapsed()}ms — volcando ${flushed} chunks / ${flushedBytes} bytes`,
+    );
   });
 
   socket.on("message", (raw) => {
@@ -1056,6 +1145,10 @@ function startDeepgramProxyStream(apiBaseUrl, accessToken) {
         if (!isCurrent) return;
         const transcript = String(data.transcript || "").trim();
         if (!transcript) return;
+        if (!sttFirstTranscriptLogged) {
+          sttFirstTranscriptLogged = true;
+          console.info(`[stt:proxy] primer transcript +${sttElapsed()}ms`);
+        }
         if (data.isFinal) {
           deepgramFinalTranscript = [deepgramFinalTranscript, transcript]
             .filter(Boolean)
@@ -1118,16 +1211,37 @@ async function finishDeepgramStream() {
   if (!socket) return deepgramFinalTranscript.trim();
 
   const done = deepgramStreamDone;
+  const isDirect = Boolean(getDeepgramApiKey());
+  const endOfInput = isDirect
+    ? JSON.stringify({ type: "Finalize" })
+    : JSON.stringify({ type: "close" });
+
+  // The socket never opened, so it never received a single byte of audio and can
+  // never produce a transcript. Waiting out HARD_CAP_MS here only delays the REST
+  // fallback — which does have the full audio — by over a second.
+  if (socket.readyState === WebSocket.CONNECTING) {
+    // Released below, so nothing will clean this one up later: tell the server we are
+    // done (politely, so it tears down its own Deepgram leg) and close it ourselves.
+    socket.once("open", () => {
+      try {
+        socket.send(endOfInput);
+        socket.close();
+      } catch {}
+    });
+    if (deepgramSocket === socket) {
+      deepgramSocket = null;
+      deepgramSocketReady = false;
+    }
+    console.warn(
+      `[stt:stream] socket aún conectando tras +${sttElapsed()}ms — sin audio enviado, va directo al fallback REST`,
+    );
+    return "";
+  }
 
   // Signal end-of-input so the server can flush its last `is_final` / `done`.
   try {
-    const isDirect = Boolean(getDeepgramApiKey());
     if (socket.readyState === WebSocket.OPEN) {
-      socket.send(isDirect ? JSON.stringify({ type: "Finalize" }) : JSON.stringify({ type: "close" }));
-    } else if (socket.readyState === WebSocket.CONNECTING && !isDirect) {
-      socket.once("open", () => {
-        try { socket.send(JSON.stringify({ type: "close" })); } catch {}
-      });
+      socket.send(endOfInput);
     }
   } catch {}
 
@@ -1243,15 +1357,27 @@ async function processRecording() {
     console.info(
       `[recording] textChunks=${textChunks.length} audioChunks=${audioChunks.length} mime=${mimeType}`,
     );
-    // If the stream closed unexpectedly mid-recording, the accumulated transcript is
-    // partial. Skip it and fall through to the REST fallback which has the full audio.
-    const streamClosedEarly = deepgramStreamClosedMidRecording;
+    // If the stream closed unexpectedly mid-recording the transcript may be partial.
+    // But a close that arrived *after* Deepgram already sent `is_final` results left
+    // usable text behind — only discard when nothing final ever landed, otherwise a
+    // late close throws away a perfectly good transcript and forces a REST round trip.
+    const closedBeforeAnyFinal =
+      deepgramStreamClosedMidRecording && !deepgramFinalTranscript;
     const streamText = settings.transcription_provider === "deepgram"
       ? await finishDeepgramStream()
       : "";
+    const usableStreamText = closedBeforeAnyFinal ? "" : streamText;
+    const source = textChunks.length
+      ? "text-chunks"
+      : usableStreamText
+        ? "stream"
+        : "rest-fallback";
+    console.info(
+      `[recording] fuente=${source} closedMidRecording=${deepgramStreamClosedMidRecording} descartadoPorCierre=${closedBeforeAnyFinal}`,
+    );
     const rawText =
       textChunks.join(" ").trim() ||
-      (streamClosedEarly ? "" : streamText) ||
+      usableStreamText ||
       (await transcribeAudio(audioChunks, mimeType).catch((error) => {
         const providerLabel =
           settings.transcription_provider === "deepgram" ? "Deepgram" : "Groq";
@@ -1427,7 +1553,11 @@ function startRecording({ handsOffMode = false } = {}) {
   // Si processRecording encuentra seleccion, entra en modo agente; si no, dictado normal.
   agentCapturePromise = (async () => {
     try {
-      const handle = await getForegroundWindowHandle();
+      const { handle, className } = await getForegroundWindowInfo();
+      if (CONSOLE_WINDOW_CLASSES.has(className)) {
+        console.info(`[agent:copy] omitido — ventana de consola (${className}); Ctrl+C la mataría`);
+        return;
+      }
       const sel = await captureSelectedTextFromActiveApp();
       const trimmed = (sel || "").trim();
       if (trimmed) {
@@ -1869,6 +1999,10 @@ app.whenReady().then(async () => {
   await refreshAccountFromBackend().catch((error) => {
     console.warn("[auth] account refresh skipped:", error instanceof Error ? error.message : String(error));
   });
+  void warmBackendConnection();
+  authWarmInterval = setInterval(() => {
+    void warmBackendConnection();
+  }, 4 * 60_000);
   Menu.setApplicationMenu(null);
 
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -1900,6 +2034,9 @@ app.whenReady().then(async () => {
     skipTaskbar: true,
     focusable: false,
   });
+  // The overlay has nothing to click, and its window is mostly transparent air. Without
+  // this it swallows every click in a 500x86 band at the bottom of the screen while visible.
+  overlayWindow.setIgnoreMouseEvents(true);
   explainWindow = createWindow("explain.html", {
     width: 520,
     height: 460,
@@ -1977,6 +2114,10 @@ app.on("window-all-closed", () => {
 app.on("will-quit", () => {
   isQuitting = true;
   globalShortcut.unregisterAll();
+  if (authWarmInterval) {
+    clearInterval(authWarmInterval);
+    authWarmInterval = null;
+  }
   try {
     if (uiohookStarted) uIOhook.stop();
   } catch {}
