@@ -1,6 +1,4 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Pause, Pin, Play } from "lucide-react";
-import { StatusBadge } from "@/overlay/components/StatusBadge";
 import { MushuReplyCard } from "@/overlay/components/MushuReplyCard";
 import { ThinkingDots } from "@/overlay/components/ThinkingDots";
 import { WaveBars } from "@/overlay/components/WaveBars";
@@ -12,6 +10,9 @@ import { cn } from "@/lib/utils";
 const ease = [0.33, 1, 0.68, 1] as const;
 const transition = { duration: 0.22, ease } as const;
 
+// The pill carries one thing at a time: the wave, the thinking dots, or the agent
+// name for a moment after it changes. No badge, no icons, no live transcript — at
+// rest it shows still dots and does nothing at all, which is the whole point.
 export function Overlay() {
   useCaptureBridge();
   const {
@@ -25,16 +26,14 @@ export function Overlay() {
     showThinking,
     transcriptionFadeOut,
     audioLevelActive,
-    isHandsOff,
     isPaused,
-    liveTranscript,
   } = useOverlayState();
 
   const audioLevel = useAudioLevel(audioLevelActive);
   const waveIdle = audioLevel < 0.04;
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-1">
+    <div className="flex h-full w-full flex-col items-center justify-center p-1">
       <AnimatePresence mode="wait">
         {showPill && (
           <motion.div
@@ -48,8 +47,8 @@ export function Overlay() {
             transition={transition}
             className={cn(
               "overlay-pill-surface text-foreground",
-              isReply ? "w-full max-w-[min(100%,408px)]" : "w-fit max-w-full min-w-0",
-              !isReply && "overlay-route-dict",
+              isReply ? "w-full max-w-[min(100%,408px)]" : "overlay-pill-compact",
+              modeBannerOnly && !isReply && "overlay-pill-banner",
             )}
           >
             <AnimatePresence mode="wait">
@@ -63,99 +62,50 @@ export function Overlay() {
                 >
                   <MushuReplyCard text={mushuReplyText} />
                 </motion.div>
+              ) : modeBannerOnly ? (
+                <motion.span
+                  key={`agent-${modePopToken}`}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={transition}
+                  className="overlay-agent-label"
+                >
+                  {activeVoiceAgent ?? "General"}
+                </motion.span>
+              ) : isProcessing ? (
+                <motion.div
+                  key="processing"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                >
+                  {showThinking ? (
+                    <ThinkingDots />
+                  ) : (
+                    <span className="inline-block min-h-4 min-w-10" aria-hidden />
+                  )}
+                </motion.div>
               ) : (
                 <motion.div
-                  key="main-surface"
-                  initial={{ opacity: 0, scale: 0.96 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
+                  key="wave"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   transition={transition}
-                  className={cn(
-                    "flex min-h-0 items-center gap-2 px-2.5 py-1",
-                    modeBannerOnly || isProcessing ? "justify-center" : "justify-between",
-                  )}
                 >
-                  {!isProcessing && (
-                    <StatusBadge
-                      label={activeVoiceAgent ?? "General"}
-                      isAgent={!!activeVoiceAgent}
-                      className="max-w-[min(100%,280px)]"
-                      key={modePopToken}
-                    />
-                  )}
-                  {!modeBannerOnly && !isProcessing && liveTranscript && (
-                    <motion.span
-                      key="live-transcript"
-                      initial={{ opacity: 0, y: 3 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -3 }}
-                      transition={transition}
-                      className="overlay-live-transcript"
-                    >
-                      {liveTranscript}
-                    </motion.span>
-                  )}
-                  {!modeBannerOnly && (
-                    <div
-                      className={cn(
-                        "flex min-h-8 shrink-0 items-center gap-1.5",
-                        isProcessing ? "min-w-[52px] justify-center" : "min-w-[100px] justify-end",
-                      )}
-                    >
-                      {isProcessing ? (
-                        showThinking ? (
-                          <ThinkingDots />
-                        ) : (
-                          <span className="inline-block min-h-4 min-w-10" aria-hidden />
-                        )
-                      ) : isPaused ? (
-                        <motion.span
-                          initial={{ opacity: 0, scale: 0.7 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.7 }}
-                          transition={transition}
-                          title="Pausado — usa Ctrl+Shift+P para reanudar"
-                          className="overlay-resume-chip"
-                        >
-                          <Play size={12} strokeWidth={3} />
-                          <span>Resume</span>
-                        </motion.span>
-                      ) : (
-                        <>
-                          <motion.span
-                            initial={{ opacity: 0, scale: 0.7 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.7 }}
-                            transition={transition}
-                            title="Usa Ctrl+Shift+P para pausar"
-                            className="overlay-pause-hint"
-                          >
-                            <Pause size={12} strokeWidth={2.6} />
-                          </motion.span>
-                          {isHandsOff && (
-                            <motion.span
-                              initial={{ opacity: 0, scale: 0.7 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.7 }}
-                              transition={transition}
-                              title="Hands-off activo — toca el atajo para detener"
-                              style={{ color: "#737373", lineHeight: 0 }}
-                            >
-                              <Pin size={12} strokeWidth={2.5} />
-                            </motion.span>
-                          )}
-                          <WaveBars level={audioLevel} color="#FFFFFF" idle={waveIdle} />
-                        </>
-                      )}
-                    </div>
-                  )}
+                  <WaveBars
+                    level={audioLevel}
+                    color={isPaused ? "#EF4444" : "#FFFFFF"}
+                    idle={waveIdle || isPaused}
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   );
 }

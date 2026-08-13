@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 
-const BAR_COUNT = 22;
-const BAR_WIDTH = 2;
-const BAR_GAP = 2;
-const MIN_H = 3;
-const MAX_H = 28;
+const BAR_COUNT = 9;
+const BAR_WIDTH = 2.5;
+const BAR_GAP = 3.5;
+const MIN_H = 2.5;
+const MAX_H = 16;
 const LERP = 0.28;
 
 export function WaveBars({
@@ -37,11 +37,9 @@ export function WaveBars({
     const tick = (now: number) => {
       const targets = new Array<number>(BAR_COUNT);
       if (idleRef.current) {
-        for (let i = 0; i < BAR_COUNT; i++) {
-          const phase = now / 760 + i * 0.44;
-          const breath = (Math.sin(phase) + 1) * 0.5; // 0..1
-          targets[i] = MIN_H + breath * 3;
-        }
+        // Dead still at rest. A breathing idle animation reads as "the app is doing
+        // something", which is exactly what the overlay should not say when it isn't.
+        targets.fill(MIN_H);
       } else {
         const lv = Math.max(0, Math.min(1, levelRef.current));
         for (let i = 0; i < BAR_COUNT; i++) {
@@ -71,7 +69,7 @@ export function WaveBars({
 
   return (
     <div
-      className={cn("flex h-8 items-center justify-end", className)}
+      className={cn("flex h-4 items-center justify-center", className)}
       style={{ gap: `${BAR_GAP}px` }}
     >
       {Array.from({ length: BAR_COUNT }, (_, i) => {
