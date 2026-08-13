@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import crypto from "node:crypto";
 import { uIOhook, UiohookKey } from "uiohook-napi";
@@ -162,25 +162,88 @@ function broadcast(channel, payload) {
   }
 }
 
-function pasteClipboardToActiveApp() {
-  if (process.platform !== "win32") return Promise.resolve();
+// Spawning powershell.exe and loading the WinForms assembly costs ~1200ms, measured.
+// Doing that per keystroke made pasting the dominant cost of a dictation: the transcript
+// is ready ~212ms after the hotkey is released, then the app spent over a second starting
+// a .NET runtime to press Ctrl+V. One long-lived host pays it once, at startup.
+let keystrokeHost = null;
+let keystrokeSeq = 0;
 
-  return new Promise((resolve, reject) => {
-    execFile(
-      "powershell.exe",
-      [
-        "-NoProfile",
-        "-STA",
-        "-Command",
-        "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')",
-      ],
-      { windowsHide: true },
-      (error) => {
-        if (error) reject(error);
-        else resolve();
-      },
-    );
+function ensureKeystrokeHost() {
+  if (process.platform !== "win32") return null;
+  if (keystrokeHost && !keystrokeHost.proc.killed) return keystrokeHost;
+
+  const proc = spawn(
+    "powershell.exe",
+    ["-NoProfile", "-STA", "-NoLogo", "-NonInteractive", "-Command", "-"],
+    { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] },
+  );
+
+  const host = { proc, pending: new Map(), buffer: "" };
+  const drop = () => {
+    for (const resolve of host.pending.values()) resolve();
+    host.pending.clear();
+    if (keystrokeHost === host) keystrokeHost = null;
+  };
+  proc.on("exit", drop);
+  proc.on("error", drop);
+
+  // Each command echoes a marker so callers can await the keystroke actually landing,
+  // rather than just await the write to stdin.
+  proc.stdout.on("data", (chunk) => {
+    host.buffer += String(chunk);
+    let idx;
+    while ((idx = host.buffer.indexOf("\n")) !== -1) {
+      const line = host.buffer.slice(0, idx).trim();
+      host.buffer = host.buffer.slice(idx + 1);
+      const resolve = host.pending.get(line);
+      if (resolve) {
+        host.pending.delete(line);
+        resolve();
+      }
+    }
   });
+
+  proc.stdin.write("Add-Type -AssemblyName System.Windows.Forms\n");
+  keystrokeHost = host;
+  return host;
+}
+
+function sendKeystroke(keys) {
+  if (process.platform !== "win32") return Promise.resolve();
+  const host = ensureKeystrokeHost();
+
+  if (host?.proc.stdin.writable) {
+    const marker = `__mushu_k${++keystrokeSeq}__`;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        host.pending.delete(marker);
+        resolve();
+      }, 2000);
+      host.pending.set(marker, () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      try {
+        host.proc.stdin.write(
+          `[System.Windows.Forms.SendKeys]::SendWait('${keys}'); Write-Output '${marker}'\n`,
+        );
+      } catch {
+        clearTimeout(timer);
+        host.pending.delete(marker);
+        resolve();
+      }
+    });
+  }
+
+  // Host unavailable (died, or first call raced startup) — fall back to a cold spawn.
+  return execPowerShell(
+    `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${keys}')`,
+  ).catch(() => {});
+}
+
+function pasteClipboardToActiveApp() {
+  return sendKeystroke("^v");
 }
 
 function execPowerShell(script) {
@@ -198,10 +261,7 @@ function execPowerShell(script) {
 }
 
 function sendCopyToActiveApp() {
-  if (process.platform !== "win32") return Promise.resolve();
-  return execPowerShell(
-    "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^c')",
-  );
+  return sendKeystroke("^c");
 }
 
 // Window classes where Ctrl+C means "kill the running process", not "copy". Sending the
@@ -2003,6 +2063,8 @@ app.whenReady().then(async () => {
   authWarmInterval = setInterval(() => {
     void warmBackendConnection();
   }, 4 * 60_000);
+  // Pay the ~1200ms PowerShell + WinForms startup now, not on the first paste.
+  ensureKeystrokeHost();
   Menu.setApplicationMenu(null);
 
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -2118,6 +2180,10 @@ app.on("will-quit", () => {
     clearInterval(authWarmInterval);
     authWarmInterval = null;
   }
+  try {
+    keystrokeHost?.proc.kill();
+    keystrokeHost = null;
+  } catch {}
   try {
     if (uiohookStarted) uIOhook.stop();
   } catch {}
