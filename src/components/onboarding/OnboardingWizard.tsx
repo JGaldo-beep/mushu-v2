@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
 const STEPS = ["welcome", "mic", "shortcuts", "signin", "done"] as const;
 const STEP_COUNT = STEPS.length;
 
-const CONFETTI_COLORS = ["#0A0A0A", "#262626", "#525252", "#737373", "#A3A3A3", "#D4D4D4"];
+// Brand greens plus the warm neutrals they sit on — grayscale confetti is a contradiction.
+const CONFETTI_COLORS = ["#64AA84", "#8FBFA6", "#3F6B55", "#C6DACC", "#E3EDE6", "#EDE6DB"];
 type ConfettiStyle = CSSProperties & {
   "--tx": string;
   "--ty": string;

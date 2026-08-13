@@ -57,11 +57,11 @@ export function TitleBar() {
       />
 
       {/* Buttons are siblings of the drag region — pointer events work normally */}
-      <WinBtn hoverBg="rgba(255,255,255,0.08)" onClick={() => void window.mushu.invoke("window_minimize")}>
+      <WinBtn hoverBg="var(--secondary)" onClick={() => void window.mushu.invoke("window_minimize")}>
         <Minus size={12} strokeWidth={2} />
       </WinBtn>
       <WinBtn
-        hoverBg="rgba(255,255,255,0.08)"
+        hoverBg="var(--secondary)"
         onClick={() => void window.mushu.invoke("window_toggle_maximize")}
       >
         <Square size={10} strokeWidth={2} />

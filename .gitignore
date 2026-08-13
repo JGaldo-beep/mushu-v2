@@ -160,3 +160,6 @@ release/
 Thumbs.db
 desktop.ini
 tmpclaude-*
+
+# Local research notes (competitor recon, scratch analysis)
+recon/

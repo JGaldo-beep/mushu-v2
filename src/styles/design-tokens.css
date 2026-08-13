@@ -1,24 +1,28 @@
 /* ============================================================
-   Mushu component utilities and overrides — monochrome edition.
-   Token source: index.css (editorial monochrome palette).
+   Mushu component utilities and overrides.
+   Token source: index.css (warm neutrals + brand sage).
    This file only adds component-level utilities and animations
-   that consume those tokens. No chromatic accents — type and
-   spacing carry the design.
+   that consume those tokens.
    ============================================================ */
 
 /* Backward-compat aliases for legacy token names that components
- * still consume via inline styles. All map onto the monochrome scale.
+ * still consume via inline styles. These used to flatten every accent onto
+ * --foreground, which is why the app read as monochrome no matter what the
+ * palette said — a component asking for "accent" got the body text colour.
+ * They now resolve to the brand tokens.
  */
 :root,
 .dark {
   --text-primary: var(--foreground);
   --text-secondary: color-mix(in oklab, var(--foreground) 65%, transparent);
-  --text-muted: color-mix(in oklab, var(--foreground) 42%, transparent);
+  /* Was 42% opacity, which measured 3.2:1 on cream — below AA. --muted-foreground
+   * is the verified token for secondary text (5.50:1 light, 6.44:1 dark). */
+  --text-muted: var(--muted-foreground);
 
-  --accent-primary: var(--foreground);
-  --accent-secondary: var(--muted-foreground);
-  --accent-hover: var(--foreground);
-  --accent-deep: var(--foreground);
+  --accent-primary: var(--primary);
+  --accent-secondary: var(--accent-foreground);
+  --accent-hover: color-mix(in oklab, var(--primary) 84%, var(--foreground));
+  --accent-deep: color-mix(in oklab, var(--primary) 70%, black);
 
   --glass-bg: var(--card);
   --glass-bg-strong: var(--card);
@@ -27,7 +31,7 @@
   --glass-border-outer: var(--border);
   --glass-border-accent: var(--ring);
 
-  --delta-green: var(--muted-foreground);
+  --delta-green: var(--primary);
   --delta-red: var(--destructive);
 
   --sidebar-background: var(--sidebar);

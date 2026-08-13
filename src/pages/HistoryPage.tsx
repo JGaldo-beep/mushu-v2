@@ -16,7 +16,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useHistoryContext } from "@/context/HistoryContext";
-import { HISTORY_BADGE_COLOR, historyIcon, historyLabel } from "@/lib/historyDisplay";
+import { HISTORY_BADGE_COLOR, historyBadgeTint, historyIcon, historyLabel } from "@/lib/historyDisplay";
 import type { HistoryItem } from "@/lib/types";
 
 interface HistoryPageProps {
@@ -94,6 +94,10 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
         style={{
           flexShrink: 0,
           borderBottom: embedded ? "0.5px solid var(--glass-border-outer)" : undefined,
+          // When embedded, SheetContent overlays its own close button at `top-4 right-4`
+          // (see components/ui/sheet.tsx). Reserve the lane so it stops landing on the
+          // clear-history button.
+          paddingRight: embedded ? "44px" : undefined,
         }}
       >
         <div className="flex items-center gap-3">
@@ -276,8 +280,8 @@ function HistoryRow({ item }: { item: HistoryItem }) {
           <span
             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5"
             style={{
-              background: `${color}14`,
-              border: `0.5px solid ${color}40`,
+              background: historyBadgeTint(8),
+              border: `0.5px solid ${historyBadgeTint(25)}`,
               color,
               fontSize: "10.5px",
               fontFamily: "'Geist Variable', sans-serif",

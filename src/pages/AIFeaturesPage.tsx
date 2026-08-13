@@ -69,7 +69,7 @@ export function AIFeaturesPage() {
         <div className="flex flex-col gap-3">
           <InfoCard
             icon={Sparkles}
-            color="#525252"
+            color="var(--primary)"
             title="Agent mode"
             description="If you select text before dictating, Mushu uses what you say as the instruction and replaces the selection with the result. No extra shortcut or configuration."
             example='Example: select "Hi, how are you?" → hold the shortcut + say "translate to Spanish" → replaces with "Hola, ¿cómo estás?".'
@@ -77,7 +77,7 @@ export function AIFeaturesPage() {
 
           <FeatureCard
             icon={Languages}
-            color="#737373"
+            color="var(--chart-2)"
             title="Auto-translate"
             description="Automatically translates to the selected language."
             value={ai.autoTranslateEnabled}
@@ -153,8 +153,8 @@ function InfoCard({ icon: Icon, color, title, description, example }: InfoCardPr
             width: "44px",
             height: "44px",
             borderRadius: "var(--radius)",
-            background: `${color}14`,
-            border: `0.5px solid ${color}30`,
+            background: `color-mix(in oklab, ${color} 8%, transparent)`,
+            border: `0.5px solid color-mix(in oklab, ${color} 19%, transparent)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -217,8 +217,8 @@ function FeatureCard({ icon: Icon, color, title, description, value, onChange, e
             width: "44px",
             height: "44px",
             borderRadius: "var(--radius)",
-            background: `${color}14`,
-            border: `0.5px solid ${color}30`,
+            background: `color-mix(in oklab, ${color} 8%, transparent)`,
+            border: `0.5px solid color-mix(in oklab, ${color} 19%, transparent)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

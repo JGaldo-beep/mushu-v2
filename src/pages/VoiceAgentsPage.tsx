@@ -17,7 +17,10 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useVoiceAgents } from "@/hooks/useVoiceAgents";
 import type { VoiceAgent } from "@/lib/types";
 
-const AGENT_COLOR = "#737373";
+const AGENT_COLOR = "var(--primary)";
+/** Token-driven tint. The old `${AGENT_COLOR}14` hex-alpha trick can't work with var(). */
+const agentTint = (percent: number) =>
+  `color-mix(in oklab, ${AGENT_COLOR} ${percent}%, transparent)`;
 
 function AgentDialog({
   open,
@@ -225,10 +228,10 @@ export function VoiceAgentsPage() {
                     style={{
                       minHeight: "180px",
                       border: isActive
-                        ? `0.5px solid ${AGENT_COLOR}55`
+                        ? `0.5px solid ${agentTint(33)}`
                         : "0.5px solid var(--glass-border-outer)",
                       boxShadow: isActive
-                        ? `inset 0 1px 0 var(--glass-border), 0 0 0 1px ${AGENT_COLOR}40, 0 8px 24px rgba(0,0,0,0.30)`
+                        ? `inset 0 1px 0 var(--glass-border), 0 0 0 1px ${agentTint(25)}, 0 8px 24px rgba(0,0,0,0.30)`
                         : "inset 0 1px 0 var(--glass-border), 0 1px 2px rgba(0,0,0,0.20), 0 8px 24px rgba(0,0,0,0.28)",
                     }}
                   >
@@ -238,8 +241,8 @@ export function VoiceAgentsPage() {
                           width: "44px",
                           height: "44px",
                           borderRadius: "12px",
-                          background: `${AGENT_COLOR}14`,
-                          border: `0.5px solid ${AGENT_COLOR}30`,
+                          background: agentTint(8),
+                          border: `0.5px solid ${agentTint(19)}`,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -252,8 +255,8 @@ export function VoiceAgentsPage() {
                           <span
                             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5"
                             style={{
-                              background: `${AGENT_COLOR}14`,
-                              border: `0.5px solid ${AGENT_COLOR}40`,
+                              background: agentTint(8),
+                              border: `0.5px solid ${agentTint(25)}`,
                               color: AGENT_COLOR,
                               fontFamily: "'Space Mono', monospace",
                               fontSize: "9px",
