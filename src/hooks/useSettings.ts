@@ -29,14 +29,11 @@ export function useSettings() {
   }, [load]);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    void listen("frontend_state_changed", () => {
+    const unlistenPromise = listen("frontend_state_changed", () => {
       void load();
-    }).then((u) => {
-      unlisten = u;
     });
     return () => {
-      unlisten?.();
+      void unlistenPromise.then((u) => u());
     };
   }, [load]);
 

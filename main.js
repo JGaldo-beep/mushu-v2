@@ -34,6 +34,42 @@ app.setPath("userData", path.join(appDataPath, "MushuV2Electron"));
 app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
 app.commandLine.appendSwitch("disk-cache-size", "0");
 
+// The packaged app has no console, so when dictation silently stops working there was
+// nothing to look at afterwards. Mirror console output into userData/logs/main.log
+// (rotated once at startup past 2 MB) so a failure can be diagnosed after the fact.
+function installFileLogger() {
+  try {
+    const logDir = path.join(app.getPath("userData"), "logs");
+    fsSync.mkdirSync(logDir, { recursive: true });
+    const logPath = path.join(logDir, "main.log");
+    try {
+      if (fsSync.statSync(logPath).size > 2 * 1024 * 1024) {
+        fsSync.renameSync(logPath, path.join(logDir, "main.old.log"));
+      }
+    } catch {}
+    const stream = fsSync.createWriteStream(logPath, { flags: "a" });
+    for (const level of ["info", "warn", "error"]) {
+      const original = console[level].bind(console);
+      console[level] = (...args) => {
+        original(...args);
+        const line = args
+          .map((a) => {
+            if (a instanceof Error) return a.stack || a.message;
+            if (typeof a === "string") return a;
+            try {
+              return JSON.stringify(a);
+            } catch {
+              return String(a);
+            }
+          })
+          .join(" ");
+        stream.write(`${new Date().toISOString()} ${level.toUpperCase()} ${line}\n`);
+      };
+    }
+  } catch {}
+}
+installFileLogger();
+
 // In dev, runtime assets live in public/. In production the renderer is built
 // by Vite which copies public/* to dist/*. Use this helper for any asset main.js
 // reads at runtime (tray icons, window icons, etc.) so we hit the right path
@@ -98,6 +134,13 @@ let ctrlReleasedAt = 0;
 let syntheticCtrlSpaceActive = false;
 const CTRL_SEQUENTIAL_TOLERANCE_MS = 500;
 let uiohookStarted = false;
+// Last time the native hook delivered any key event. Windows silently unhooks a
+// low-level keyboard hook it considers slow, and uIOhook gets no notice — after that
+// key-ups (hold-to-talk release, hands-off stop) and the PTT hotkey simply vanish.
+// globalShortcut keeps working, so a hotkey press the hook did not also see is proof
+// the hook is dead.
+let lastHookEventAt = 0;
+let hookHealthTimer = null;
 let deepgramSocket = null;
 let deepgramSocketReady = false;
 let deepgramSocketFailed = false;
@@ -106,6 +149,9 @@ let deepgramFinalTranscript = "";
 let deepgramInterimTranscript = "";
 let deepgramStreamDone = null;
 let deepgramStreamSeconds = 0;
+let deepgramLastResultAt = 0;
+// Bumped on every startRecording(); lets a late processRecording() tell it is stale.
+let recordingSeq = 0;
 // Timings del arranque del stream. Cada tramo (auth → socket abierto → primer
 // transcript) se loggea relativo a sttStartedAt para poder ver, cuando un dictado
 // falla, cuál de ellos se pasó de tiempo.
@@ -179,7 +225,7 @@ function ensureKeystrokeHost() {
     { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] },
   );
 
-  const host = { proc, pending: new Map(), buffer: "" };
+  const host = { proc, pending: new Map(), buffer: "", lines: [] };
   const drop = () => {
     for (const resolve of host.pending.values()) resolve();
     host.pending.clear();
@@ -189,7 +235,8 @@ function ensureKeystrokeHost() {
   proc.on("error", drop);
 
   // Each command echoes a marker so callers can await the keystroke actually landing,
-  // rather than just await the write to stdin.
+  // rather than just await the write to stdin. Commands run in order, so any output
+  // lines seen before a marker belong to that marker's command.
   proc.stdout.on("data", (chunk) => {
     host.buffer += String(chunk);
     let idx;
@@ -199,14 +246,55 @@ function ensureKeystrokeHost() {
       const resolve = host.pending.get(line);
       if (resolve) {
         host.pending.delete(line);
-        resolve();
+        const output = host.lines.join("\n");
+        host.lines = [];
+        resolve(output);
+      } else if (line.startsWith("__mushu_k")) {
+        host.lines = []; // marker of a command whose caller already timed out
+      } else if (line) {
+        host.lines.push(line);
       }
     }
   });
 
   proc.stdin.write("Add-Type -AssemblyName System.Windows.Forms\n");
+  // Compiled once per host: Add-Type of the same type twice in one session fails. Kept
+  // on a single line — `-Command -` stdin mode is unreliable with multi-line here-strings.
+  const win32Members = [
+    '[DllImport("user32.dll")] public static extern System.IntPtr GetForegroundWindow();',
+    '[DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(System.IntPtr hWnd, System.Text.StringBuilder buf, int max);',
+    '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr hWnd);',
+    '[DllImport("user32.dll")] public static extern bool IsIconic(System.IntPtr hWnd);',
+    '[DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr hWnd, int nCmdShow);',
+  ].join(" ");
+  proc.stdin.write(`Add-Type -Namespace Mushu -Name Win32 -UsingNamespace System.Text -MemberDefinition '${win32Members}'\n`);
   keystrokeHost = host;
   return host;
+}
+
+// Runs a one-line PowerShell statement in the warm host and resolves with its output,
+// or null when the host is unavailable or the command timed out.
+function runInHost(statement, timeoutMs = 2000) {
+  const host = ensureKeystrokeHost();
+  if (!host?.proc.stdin.writable) return Promise.resolve(null);
+  const marker = `__mushu_k${++keystrokeSeq}__`;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      host.pending.delete(marker);
+      resolve(null);
+    }, timeoutMs);
+    host.pending.set(marker, (output) => {
+      clearTimeout(timer);
+      resolve(output ?? null);
+    });
+    try {
+      host.proc.stdin.write(`${statement}; Write-Output '${marker}'\n`);
+    } catch {
+      clearTimeout(timer);
+      host.pending.delete(marker);
+      resolve(null);
+    }
+  });
 }
 
 function sendKeystroke(keys) {
@@ -214,26 +302,7 @@ function sendKeystroke(keys) {
   const host = ensureKeystrokeHost();
 
   if (host?.proc.stdin.writable) {
-    const marker = `__mushu_k${++keystrokeSeq}__`;
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        host.pending.delete(marker);
-        resolve();
-      }, 2000);
-      host.pending.set(marker, () => {
-        clearTimeout(timer);
-        resolve();
-      });
-      try {
-        host.proc.stdin.write(
-          `[System.Windows.Forms.SendKeys]::SendWait('${keys}'); Write-Output '${marker}'\n`,
-        );
-      } catch {
-        clearTimeout(timer);
-        host.pending.delete(marker);
-        resolve();
-      }
-    });
+    return runInHost(`[System.Windows.Forms.SendKeys]::SendWait('${keys}')`).then(() => {});
   }
 
   // Host unavailable (died, or first call raced startup) — fall back to a cold spawn.
@@ -277,6 +346,16 @@ const CONSOLE_WINDOW_CLASSES = new Set([
 
 async function getForegroundWindowInfo() {
   if (process.platform !== "win32") return { handle: null, className: "" };
+  // Warm host first: a cold powershell.exe costs ~1.2s of CPU at the exact moment the
+  // microphone is starting up.
+  const warm = await runInHost(
+    '$h = [Mushu.Win32]::GetForegroundWindow(); $sb = New-Object System.Text.StringBuilder 256; [Mushu.Win32]::GetClassName($h, $sb, 256) | Out-Null; "$($h.ToInt64())|$($sb.ToString())"',
+  );
+  if (warm) {
+    const [rawHandle, ...rest] = warm.trim().split("|");
+    const n = Number(rawHandle);
+    return { handle: Number.isFinite(n) && n > 0 ? n : null, className: rest.join("|").trim() };
+  }
   try {
     const script = [
       "$sig = @'",
@@ -303,6 +382,15 @@ async function getForegroundWindowInfo() {
 
 async function focusWindowAndPaste(handle) {
   if (process.platform !== "win32") return;
+  if (handle && ensureKeystrokeHost()?.proc.stdin.writable) {
+    const h = `[System.IntPtr]::new(${Number(handle)})`;
+    // No cold fallback on timeout: the paste may already have landed, and a second
+    // attempt would paste twice.
+    await runInHost(
+      `if ([Mushu.Win32]::IsIconic(${h})) { [Mushu.Win32]::ShowWindow(${h}, 9) | Out-Null }; [Mushu.Win32]::SetForegroundWindow(${h}) | Out-Null; Start-Sleep -Milliseconds 70; [System.Windows.Forms.SendKeys]::SendWait('^v')`,
+    );
+    return;
+  }
   const handleArg = handle ? `[System.IntPtr]::new(${handle})` : "[System.IntPtr]::Zero";
   const script = [
     "$sig = @'",
@@ -500,7 +588,22 @@ function publicAccountFromSession(session, entitlement = accountCache?.entitleme
   };
 }
 
-async function refreshSupabaseSession() {
+// Supabase rotates refresh tokens: each one is single-use. The background warmer, a
+// recording and a 401 retry could all refresh at once, and the losers presented an
+// already-spent token, got rejected and signed the user out — after which every
+// dictation failed. All callers now share one in-flight refresh.
+let refreshInFlight = null;
+
+function refreshSupabaseSession() {
+  if (!refreshInFlight) {
+    refreshInFlight = doRefreshSupabaseSession().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+async function doRefreshSupabaseSession() {
   const session = secrets.mushu_session;
   if (!session?.refresh_token) return null;
   const { supabaseUrl, supabaseAnonKey } = requireAuthConfig();
@@ -511,16 +614,25 @@ async function refreshSupabaseSession() {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ refresh_token: session.refresh_token }),
+    signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
-    secrets.mushu_session = null;
-    accountCache = null;
-    await persistState();
-    return null;
+    // Only a rejected refresh token means the session is really over. A 5xx, a 429 or
+    // a flaky network after waking from sleep must not sign the user out: keep the
+    // session and let the next attempt retry.
+    if (response.status === 400 || response.status === 401) {
+      console.warn(`[auth] refresh token rejected (${response.status}) — signing out`);
+      secrets.mushu_session = null;
+      accountCache = null;
+      await persistState();
+      broadcast("frontend_state_changed", {});
+      return null;
+    }
+    throw new Error(`Supabase refresh ${response.status}`);
   }
   const refreshed = await response.json();
   secrets.mushu_session = refreshed;
-  accountCache = publicAccountFromSession(refreshed);
+  accountCache = publicAccountFromSession(refreshed, accountCache?.entitlement || null);
   await persistState();
   return refreshed;
 }
@@ -535,7 +647,13 @@ async function getValidSession() {
   if (!session?.access_token) return null;
   const expiresAtMs = Number(session.expires_at || 0) * 1000;
   if (expiresAtMs && Date.now() > expiresAtMs - SESSION_REFRESH_MARGIN_MS) {
-    return refreshSupabaseSession();
+    try {
+      return await refreshSupabaseSession();
+    } catch (error) {
+      // Transient refresh failure: the current token is still usable until it expires.
+      if (Date.now() < expiresAtMs) return session;
+      throw error;
+    }
   }
   return session;
 }
@@ -678,7 +796,12 @@ async function getBackendAuthContext() {
   };
 }
 
+// Without a deadline a stalled connection (Wi-Fi drop, laptop waking up) left the
+// overlay stuck on "processing" indefinitely.
+const BACKEND_TIMEOUT_MS = 45_000;
+
 async function fetchWithBackendAuth(url, accessToken, init = {}) {
+  init = { ...init, signal: init.signal ?? AbortSignal.timeout(BACKEND_TIMEOUT_MS) };
   const headers = {
     ...(init.headers || {}),
     Authorization: `Bearer ${accessToken}`,
@@ -769,6 +892,82 @@ function createWindow(htmlFile, options) {
   return win;
 }
 
+// The overlay renderer owns the microphone pipeline as well as the pill, so if its
+// process dies (GPU reset after sleep, OOM, driver crash) both the pill and dictation
+// disappear for the rest of the session. Recreate it whenever that happens.
+let overlayRecreateTimer = null;
+
+function createOverlayWindow() {
+  const win = createWindow("overlay.html", {
+    width: 500,
+    height: 86,
+    transparent: true,
+    backgroundColor: "#00000000",
+    frame: false,
+    hasShadow: false,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      // Hidden most of the time; Chromium would otherwise throttle its timers and
+      // audio between dictations, which delays the first chunk after a long idle.
+      backgroundThrottling: false,
+    },
+  });
+  // The overlay has nothing to click, and its window is mostly transparent air. Without
+  // this it swallows every click in a 500x86 band at the bottom of the screen while visible.
+  win.setIgnoreMouseEvents(true);
+  win.setAlwaysOnTop(true, "screen-saver");
+
+  const recreate = (reason) => {
+    if (isQuitting || overlayRecreateTimer) return;
+    console.error(`[overlay] ${reason} — recreating overlay window`);
+    if (recording) stopRecording({ cancel: true });
+    overlayRecreateTimer = setTimeout(() => {
+      overlayRecreateTimer = null;
+      if (overlayWindow === win) overlayWindow = null;
+      try {
+        if (!win.isDestroyed()) win.destroy();
+      } catch {}
+      createOverlayWindow();
+    }, 300);
+  };
+  win.webContents.on("render-process-gone", (_event, details) => recreate(`renderer gone (${details?.reason})`));
+  // A renderer can stall briefly (display wake, heavy load); only rebuild if it stays hung.
+  let hangTimer = null;
+  win.on("unresponsive", () => {
+    if (hangTimer) return;
+    hangTimer = setTimeout(() => recreate("renderer unresponsive for 3s"), 3000);
+  });
+  win.on("responsive", () => {
+    if (hangTimer) clearTimeout(hangTimer);
+    hangTimer = null;
+  });
+  win.webContents.once("did-finish-load", () => {
+    win.webContents.send("mushu_sound_prefs", {
+      enabled: settings.sound_effects_enabled,
+      volume: settings.sound_effects_volume,
+    });
+    // Created mid-recording (the previous renderer was gone): it missed the start
+    // event, so replay it and the new renderer opens the microphone.
+    if (recording) {
+      win.webContents.send("recording_started", {
+        selected_microphone: settings.selected_microphone ?? null,
+        active_voice_agent: getActiveVoiceAgent(),
+      });
+    }
+  });
+  overlayWindow = win;
+  positionOverlay();
+  return win;
+}
+
 function positionOverlay() {
   if (!overlayWindow) return;
   const cursor = screen.getCursorScreenPoint();
@@ -778,6 +977,24 @@ function positionOverlay() {
   const x = Math.round(display.workArea.x + (display.workArea.width - width) / 2);
   const y = Math.round(display.workArea.y + display.workArea.height - height - 40);
   overlayWindow.setBounds({ x, y, width, height }, false);
+}
+
+function hideOverlay() {
+  if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide();
+}
+
+function showOverlay() {
+  let win = overlayWindow;
+  if (!win || win.isDestroyed()) win = createOverlayWindow();
+  if (win.webContents.isCrashed()) {
+    win.destroy();
+    win = createOverlayWindow();
+  }
+  positionOverlay();
+  // Windows drops the topmost flag after some fullscreen apps and explorer restarts,
+  // which left the pill rendering behind the focused window. Re-assert it every time.
+  win.setAlwaysOnTop(true, "screen-saver");
+  win.showInactive();
 }
 
 function setupTray() {
@@ -850,14 +1067,13 @@ function matchesShortcut(evt, shortcut) {
 }
 
 function showOverlayBanner() {
-  positionOverlay();
-  overlayWindow?.showInactive();
+  showOverlay();
   broadcast("overlay_mode_banner", { active: true });
   if (modeBannerTimer) clearTimeout(modeBannerTimer);
   modeBannerTimer = setTimeout(() => {
     modeBannerTimer = null;
     broadcast("overlay_mode_banner", { active: false });
-    if (!recording) overlayWindow?.hide();
+    if (!recording) hideOverlay();
   }, 1100);
 }
 
@@ -1082,6 +1298,7 @@ function startDeepgramDirectStream(apiKey) {
       if (data.type !== "Results") return;
       const transcript = (data.channel?.alternatives?.[0]?.transcript || "").trim();
       if (!transcript) return;
+      deepgramLastResultAt = Date.now();
       if (!sttFirstTranscriptLogged) {
         sttFirstTranscriptLogged = true;
         console.info(`[stt:direct] primer transcript +${sttElapsed()}ms`);
@@ -1205,6 +1422,7 @@ function startDeepgramProxyStream(apiBaseUrl, accessToken) {
         if (!isCurrent) return;
         const transcript = String(data.transcript || "").trim();
         if (!transcript) return;
+        deepgramLastResultAt = Date.now();
         if (!sttFirstTranscriptLogged) {
           sttFirstTranscriptLogged = true;
           console.info(`[stt:proxy] primer transcript +${sttElapsed()}ms`);
@@ -1307,11 +1525,18 @@ async function finishDeepgramStream() {
 
   // Return as soon as the transcript is stable (no pending interim) so the user
   // sees pasted text immediately. We poll every 25ms after a 200ms grace that
-  // lets Deepgram flush its last `is_final` post-Finalize. The 1200ms cap is
-  // the worst case (slow proxy bookkeeping). The socket is released here but
-  // the proxy's late `done` message still applies billing — see the message
-  // handler in startDeepgramProxyStream.
-  const HARD_CAP_MS = 1200;
+  // lets Deepgram flush its last `is_final` post-Finalize. The socket is released
+  // here but the proxy's late `done` message still applies billing — see the
+  // message handler in startDeepgramProxyStream.
+  //
+  // On a long dictation Deepgram runs seconds behind the audio, so a flat 1200ms
+  // cap pasted the transcript with its last sentences missing (a 44s recording came
+  // back with interim text still pending). The cap now grows with the recording,
+  // and past 10s "stable" also requires a short quiet spell with no new results,
+  // since a lagging stream can sit between finals with no interim for a moment.
+  const recordingSeconds = recordingStartedAt ? (Date.now() - recordingStartedAt) / 1000 : 0;
+  const HARD_CAP_MS = Math.min(5000, 1200 + Math.round(recordingSeconds * 60));
+  const QUIET_MS = recordingSeconds > 10 ? 300 : 0;
   const GRACE_MS = 200;
   const POLL_MS = 25;
   const start = Date.now();
@@ -1330,7 +1555,8 @@ async function finishDeepgramStream() {
       if (
         elapsed >= GRACE_MS &&
         deepgramFinalTranscript.length > 0 &&
-        deepgramInterimTranscript.length === 0
+        deepgramInterimTranscript.length === 0 &&
+        Date.now() - deepgramLastResultAt >= QUIET_MS
       ) {
         return finish();
       }
@@ -1359,6 +1585,11 @@ async function finishDeepgramStream() {
   return result;
 }
 
+// The REST fallback only runs when the stream already failed, which usually means the
+// network is struggling. Give up well before the generic backend deadline so the pill
+// is not left spinning; the user can simply dictate again.
+const TRANSCRIBE_TIMEOUT_MS = 20_000;
+
 async function transcribeAudio(audioChunks, mimeType) {
   const audioBlob = makeAudioBlob(audioChunks, mimeType);
   const { apiBaseUrl, accessToken } = await getBackendAuthContext();
@@ -1375,6 +1606,7 @@ async function transcribeAudio(audioChunks, mimeType) {
       "X-Mushu-Language": settings.spoken_language === "auto" || !settings.spoken_language ? "multi" : settings.spoken_language,
     },
     body: audioBlob,
+    signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
   });
 
   if (response.status === 401) {
@@ -1388,6 +1620,7 @@ async function transcribeAudio(audioChunks, mimeType) {
         "X-Mushu-Language": settings.spoken_language === "auto" || !settings.spoken_language ? "multi" : settings.spoken_language,
       },
       body: audioBlob,
+      signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
     });
   }
 
@@ -1405,6 +1638,18 @@ async function transcribeAudio(audioChunks, mimeType) {
 
 async function processRecording() {
   broadcast("dictation_processing", { active: true });
+  // The overlay only leaves "processing" on transcription_done; every exit path,
+  // errors included, must send it or the pill is left stuck.
+  let doneSent = false;
+  // A slow processing run (REST fallback on a bad network) can finish after the user
+  // has already started the next dictation. Its events are then marked stale so the
+  // overlay ignores them instead of tearing down the recording in progress.
+  const mySeq = recordingSeq;
+  const isStale = () => recording || recordingSeq !== mySeq;
+  const sendDone = (payload) => {
+    doneSent = true;
+    broadcast("transcription_done", { ...payload, stale: isStale() });
+  };
   try {
     await sleep(settings.transcription_provider === "deepgram" ? 80 : 180);
     const textChunks = capturedChunks
@@ -1444,7 +1689,7 @@ async function processRecording() {
         throw new Error(groqErrorMessage(`${providerLabel} transcription`, error));
       }));
     if (!rawText) {
-      broadcast("transcription_done", { text: "", active_voice_agent: getActiveVoiceAgent() });
+      sendDone({ text: "", active_voice_agent: getActiveVoiceAgent() });
       return;
     }
 
@@ -1502,7 +1747,7 @@ async function processRecording() {
       });
       historyStore = historyStore.slice(0, 200);
       await persistState();
-      broadcast("transcription_done", { text: output, active_voice_agent: getActiveVoiceAgent() });
+      sendDone({ text: output, active_voice_agent: getActiveVoiceAgent() });
       await refreshAccountFromBackend().catch(() => {});
       broadcast("frontend_state_changed", {});
       return;
@@ -1524,7 +1769,7 @@ async function processRecording() {
         console.error("[voice-agent] failed:", message);
         broadcast("groq_error", message);
         broadcast("transcription_error", message);
-        broadcast("transcription_done", { text: "", active_voice_agent: activeAgent });
+        sendDone({ text: "", active_voice_agent: activeAgent });
         return;
       }
 
@@ -1543,7 +1788,7 @@ async function processRecording() {
       });
       historyStore = historyStore.slice(0, 200);
       await persistState();
-      broadcast("transcription_done", { text: output, active_voice_agent: activeAgent });
+      sendDone({ text: output, active_voice_agent: activeAgent });
       return;
     }
 
@@ -1573,14 +1818,15 @@ async function processRecording() {
     });
     historyStore = historyStore.slice(0, 200);
     await persistState();
-    broadcast("transcription_done", { text: transformed, active_voice_agent: getActiveVoiceAgent() });
+    sendDone({ text: transformed, active_voice_agent: getActiveVoiceAgent() });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[recording] failed:", message);
     broadcast("groq_error", message);
     broadcast("transcription_error", message);
   } finally {
-    broadcast("dictation_processing", { active: false });
+    if (!doneSent) sendDone({ text: "", active_voice_agent: getActiveVoiceAgent() });
+    broadcast("dictation_processing", { active: false, stale: isStale() });
   }
 }
 
@@ -1601,10 +1847,10 @@ async function cycleActiveVoiceAgent() {
 function startRecording({ handsOffMode = false } = {}) {
   if (recording) return;
   recording = true;
+  recordingSeq += 1;
   paused = false;
   handsOff = handsOffMode;
-  positionOverlay();
-  overlayWindow?.showInactive();
+  showOverlay();
   capturedChunks = [];
   recordingStartedAt = Date.now();
   agentSelection = null;
@@ -1661,15 +1907,17 @@ function stopRecording({ cancel = false } = {}) {
     broadcast("dictation_cancelled", {});
     broadcast("hands_off_changed", false);
     broadcast("dictation_paused", false);
-    overlayWindow?.hide();
+    hideOverlay();
     return;
   }
 
   broadcast("recording_stopped", {});
   broadcast("hands_off_changed", false);
   broadcast("dictation_paused", false);
+  const seq = recordingSeq;
   void processRecording().finally(() => {
-    overlayWindow?.hide();
+    // Leave the pill alone if a newer dictation has started meanwhile.
+    if (!recording && recordingSeq === seq) hideOverlay();
   });
 }
 
@@ -1702,10 +1950,14 @@ function setHotkeys() {
   if (
     hotkey &&
     !globalShortcut.register(hotkey, () => {
-      if (primaryHotkeyDown) return;
+      // Auto-repeat while held. stopRecording() always clears primaryHotkeyDown, so
+      // the flag set while *not* recording can only be a key-up that never arrived
+      // (sleep, dead hook) — honouring it swallowed every press from then on.
+      if (primaryHotkeyDown && recording) return;
       primaryHotkeyDown = true;
       primaryHotkeyStartedAt = Date.now();
       if (!recording) startRecording({ handsOffMode: false });
+      verifyHookAlive(primaryHotkeyStartedAt);
     })
   ) {
     console.error(`No se pudo registrar hotkey principal: ${hotkey}`);
@@ -1733,6 +1985,7 @@ function setHotkeys() {
     uIOhook.removeAllListeners("keydown");
     uIOhook.removeAllListeners("keyup");
     uIOhook.on("keydown", (evt) => {
+      lastHookEventAt = Date.now();
       const key = Number(evt.keycode);
 
       // Detectar press secuencial: si Space se presiona poco después de soltar Ctrl
@@ -1765,6 +2018,7 @@ function setHotkeys() {
       }
     });
     uIOhook.on("keyup", (evt) => {
+      lastHookEventAt = Date.now();
       const key = Number(evt.keycode);
 
       // Registrar cuando Ctrl se suelta para la ventana de tolerancia
@@ -1813,7 +2067,22 @@ function setHotkeys() {
 //     primaryHotkeyDown stay `true` — the next press hits the early-return guard
 //     and is silently swallowed, which is why it takes two presses to "wake up".
 // Fully stop the hook, clear the transient hold state, and re-register everything.
-function reestablishHotkeys() {
+function verifyHookAlive(pressedAt) {
+  if (!uiohookStarted) return;
+  setTimeout(() => {
+    if (lastHookEventAt >= pressedAt - 1000) return;
+    console.warn("[hotkeys] native hook missed a hotkey press — restarting it");
+    // The release of this press will not be seen reliably, so finish it with the next
+    // press instead of a key-up that might never come.
+    if (recording) {
+      handsOff = true;
+      broadcast("hands_off_changed", true);
+    }
+    reestablishHotkeys("hook dead");
+  }, 500);
+}
+
+function reestablishHotkeys(reason = "power/lock state change") {
   try {
     if (uiohookStarted) {
       uIOhook.stop();
@@ -1825,7 +2094,39 @@ function reestablishHotkeys() {
   syntheticCtrlSpaceActive = false;
   if (!recording) handsOff = false;
   setHotkeys();
-  console.info("[hotkeys] re-established after power/lock state change");
+  console.info(`[hotkeys] re-established (${reason})`);
+}
+
+// Suspend tears down what a dictation depends on: the hook, the microphone stream
+// (the device is powered off) and the network. Cancel any recording in flight and let
+// the overlay drop its now-dead microphone pipeline.
+function handleSuspend(reason) {
+  console.info(`[power] ${reason}`);
+  if (recording) stopRecording({ cancel: true });
+  broadcast("system_suspended", {});
+}
+
+// On resume the desktop and the network come back in stages, so re-arm once right away
+// and once more after things settle; then refresh the session and warm the stream host.
+function handleResume(reason) {
+  console.info(`[power] ${reason}`);
+  primaryHotkeyDown = false;
+  pttHotkeyDown = false;
+  reestablishHotkeys(reason);
+  broadcast("system_resumed", {});
+  setTimeout(() => reestablishHotkeys(`${reason} (settled)`), 4000);
+  setTimeout(() => void warmBackendConnection(), 5000);
+}
+
+// Belt and braces for the cases verifyHookAlive cannot see (e.g. only the PTT hotkey is
+// used, which goes through the hook alone): re-arm the hook while idle every few minutes.
+function startHookHealthCheck() {
+  if (hookHealthTimer) clearInterval(hookHealthTimer);
+  hookHealthTimer = setInterval(() => {
+    if (recording) return;
+    if (Date.now() - lastHookEventAt < 5 * 60_000) return;
+    reestablishHotkeys("periodic idle refresh");
+  }, 5 * 60_000);
 }
 
 function registerIpc(updateTrayMenu) {
@@ -2084,21 +2385,7 @@ app.whenReady().then(async () => {
     event.preventDefault();
     mainWindow?.hide();
   });
-  overlayWindow = createWindow("overlay.html", {
-    width: 500,
-    height: 86,
-    transparent: true,
-    backgroundColor: "#00000000",
-    frame: false,
-    hasShadow: false,
-    resizable: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    focusable: false,
-  });
-  // The overlay has nothing to click, and its window is mostly transparent air. Without
-  // this it swallows every click in a 500x86 band at the bottom of the screen while visible.
-  overlayWindow.setIgnoreMouseEvents(true);
+  createOverlayWindow();
   explainWindow = createWindow("explain.html", {
     width: 520,
     height: 460,
@@ -2115,8 +2402,11 @@ app.whenReady().then(async () => {
   setHotkeys();
 
   // Keep global hotkeys + the native hook alive across sleep/lock cycles.
-  powerMonitor.on("resume", reestablishHotkeys);
-  powerMonitor.on("unlock-screen", reestablishHotkeys);
+  powerMonitor.on("suspend", () => handleSuspend("suspend"));
+  powerMonitor.on("lock-screen", () => handleSuspend("lock-screen"));
+  powerMonitor.on("resume", () => handleResume("resume"));
+  powerMonitor.on("unlock-screen", () => handleResume("unlock-screen"));
+  startHookHealthCheck();
 
   // Auto-update via electron-updater + GitHub Releases.
   // Only runs in the packaged production build — skipped during `npm run dev`.
@@ -2154,8 +2444,6 @@ app.whenReady().then(async () => {
     });
   }
 
-  positionOverlay();
-  overlayWindow.hide();
   explainWindow.hide();
   if (pendingDeepLinkUrl) {
     await handleMushuDeepLink(pendingDeepLinkUrl);
@@ -2184,6 +2472,7 @@ app.on("will-quit", () => {
     keystrokeHost?.proc.kill();
     keystrokeHost = null;
   } catch {}
+  if (hookHealthTimer) clearInterval(hookHealthTimer);
   try {
     if (uiohookStarted) uIOhook.stop();
   } catch {}

@@ -7,6 +7,36 @@ import { listen } from "@/lib/events";
 // kept warm, then released after a period of inactivity so the OS microphone indicator
 // does not stay lit forever.
 const WARM_TTL_MS = 3 * 60 * 1000;
+// getUserMedia can hang forever when the device is mid-reset (Bluetooth headset waking,
+// driver reloading after sleep). Every later press then awaited the same stuck promise
+// and nothing was ever recorded again, so give the build a deadline.
+const BUILD_TIMEOUT_MS = 6000;
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+  onLateValue?: (value: T) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        if (timedOut) onLateValue?.(value);
+        else resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 export function useCaptureBridge() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -78,20 +108,32 @@ export function useCaptureBridge() {
       const t0 = performance.now();
       const since = () => `+${Math.round(performance.now() - t0)}ms`;
 
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await withTimeout(navigator.mediaDevices.getUserMedia({
         audio: {
           ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
         },
+      }), BUILD_TIMEOUT_MS, "getUserMedia", (late) => {
+        // Resolved after we gave up on it: hand the microphone straight back.
+        for (const track of late.getTracks()) track.stop();
       });
       console.info(`[capture] getUserMedia listo ${since()}`);
       streamRef.current = stream;
+      // The device went away (unplugged, sleep, driver reset). Drop the pipeline so the
+      // next press rebuilds it instead of recording silence from a dead track.
+      for (const track of stream.getAudioTracks()) {
+        track.addEventListener("ended", () => {
+          if (streamRef.current !== stream) return;
+          console.warn("[capture] el track del micrófono terminó — liberando pipeline");
+          releaseWarmPipeline();
+        });
+      }
 
       const audioContext = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE });
       audioContextRef.current = audioContext;
-      await audioContext.audioWorklet.addModule(WORKLET_MODULE_URL);
+      await withTimeout(audioContext.audioWorklet.addModule(WORKLET_MODULE_URL), BUILD_TIMEOUT_MS, "addModule");
       console.info(`[capture] worklet cargado ${since()}`);
 
       const worklet = new AudioWorkletNode(audioContext, "linear16-capture", {
@@ -145,12 +187,16 @@ export function useCaptureBridge() {
         releaseWarmPipeline();
       }
       if (streamRef.current && audioContextRef.current && workletRef.current) {
-        return Promise.resolve();
+        const live = streamRef.current.getAudioTracks().some((t) => t.readyState === "live");
+        if (live && audioContextRef.current.state !== "closed") return Promise.resolve();
+        console.warn("[capture] pipeline caliente pero muerto — rehaciendo");
+        releaseWarmPipeline();
       }
       if (!warmPromiseRef.current) {
         warmPromiseRef.current = buildWarmPipeline(deviceId).catch((error) => {
-          warmPromiseRef.current = null;
-          warmDeviceIdRef.current = undefined;
+          // A half-built pipeline (stream acquired, worklet failed) would leak the
+          // microphone on the next attempt; tear down whatever got built.
+          releaseWarmPipeline();
           throw error;
         });
       }
@@ -225,6 +271,26 @@ export function useCaptureBridge() {
         stopCapture();
       }),
     );
+    // A pipeline that survives sleep holds a stream from a device that was powered off.
+    unsubs.push(
+      listen("system_suspended", () => {
+        releaseWarmPipeline();
+      }),
+    );
+    unsubs.push(
+      listen("system_resumed", () => {
+        releaseWarmPipeline();
+      }),
+    );
+    // Default device changed (headset plugged in/out): the warm stream may point at the
+    // old one. Rebuild lazily on the next press rather than mid-recording.
+    const onDeviceChange = () => {
+      if (!capturingRef.current && streamRef.current) {
+        console.info("[capture] cambiaron los dispositivos de audio — liberando pipeline");
+        releaseWarmPipeline();
+      }
+    };
+    navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
 
     // Warm on mount so the first dictation after launch is fast too. The release timer
     // hands the microphone back if it goes unused.
@@ -235,6 +301,7 @@ export function useCaptureBridge() {
       });
 
     return () => {
+      navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
       releaseWarmPipeline();
       for (const u of unsubs) void u.then((off) => off());
     };

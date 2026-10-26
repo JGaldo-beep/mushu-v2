@@ -22,51 +22,46 @@ function chimeSrc(kind: "start" | "stop"): string {
   return `${root}/sounds/${kind === "start" ? "start" : "stop"}.wav`;
 }
 
+// One AudioContext and pre-decoded buffers for the whole overlay lifetime. Building a
+// context and decoding the WAV on every press added audible latency to the chime and
+// leaked a context whenever "ended" never fired.
+let chimeContext: AudioContext | null = null;
+const chimeBuffers: Partial<Record<"start" | "stop", Promise<AudioBuffer | null>>> = {};
+
+function getChimeContext(): AudioContext {
+  if (!chimeContext || chimeContext.state === "closed") chimeContext = new AudioContext();
+  return chimeContext;
+}
+
+function loadChime(kind: "start" | "stop"): Promise<AudioBuffer | null> {
+  const ctx = getChimeContext();
+  chimeBuffers[kind] ??= fetch(chimeSrc(kind))
+    .then((res) => res.arrayBuffer())
+    .then((data) => ctx.decodeAudioData(data))
+    .catch(() => {
+      delete chimeBuffers[kind];
+      return null;
+    });
+  return chimeBuffers[kind]!;
+}
+
 function playChime(kind: "start" | "stop", enabled: boolean, volume: number) {
   if (!enabled) return;
   const gainValue = Math.min(6, Math.max(0, volume) * CHIME_GAIN_BOOST);
-  const tryPlay = (attempt: number) => {
-    const audio = new Audio(chimeSrc(kind));
-    audio.volume = 1;
-
-    try {
-      const win = window as Window &
-        typeof globalThis & { webkitAudioContext?: typeof AudioContext };
-      const AudioContextCtor = window.AudioContext || win.webkitAudioContext;
-      if (!AudioContextCtor) throw new Error("AudioContext no disponible");
-      const audioContext = new AudioContextCtor();
-      const source = audioContext.createMediaElementSource(audio);
-      const gain = audioContext.createGain();
-      gain.gain.value = gainValue;
-      source.connect(gain).connect(audioContext.destination);
-      audio.addEventListener(
-        "ended",
-        () => {
-          source.disconnect();
-          gain.disconnect();
-          void audioContext.close();
-        },
-        { once: true },
-      );
-      void audioContext
-        .resume()
-        .then(() => audio.play())
-        .catch(() => {
-          void audioContext.close();
-          if (attempt >= 2) return;
-          window.setTimeout(() => tryPlay(attempt + 1), attempt === 0 ? 0 : 80);
-        });
-      return;
-    } catch {
-      audio.volume = Math.min(1, Math.max(0, volume));
-    }
-
-    void audio.play().catch(() => {
-      if (attempt >= 2) return;
-      window.setTimeout(() => tryPlay(attempt + 1), attempt === 0 ? 0 : 80);
-    });
-  };
-  tryPlay(0);
+  const ctx = getChimeContext();
+  void Promise.all([ctx.resume(), loadChime(kind)]).then(([, buffer]) => {
+    if (!buffer) return;
+    const source = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    source.buffer = buffer;
+    gain.gain.value = gainValue;
+    source.connect(gain).connect(ctx.destination);
+    source.onended = () => {
+      source.disconnect();
+      gain.disconnect();
+    };
+    source.start();
+  });
 }
 
 export type OverlaySurface =
@@ -135,6 +130,8 @@ export function useOverlayState() {
   }, [cancelMushuHide, cancelThinkPhase]);
 
   useEffect(() => {
+    void loadChime("start");
+    void loadChime("stop");
     const unsubs: Array<Promise<() => void>> = [];
 
     unsubs.push(
@@ -186,6 +183,8 @@ export function useOverlayState() {
 
     unsubs.push(
       listen("dictation_processing", (event) => {
+        // A late run of an earlier dictation must not reset the one in progress.
+        if ((event.payload as { stale?: boolean } | null)?.stale) return;
         const active = Boolean((event.payload as { active?: boolean })?.active);
         if (active) {
           setModeBannerOnly(false);
@@ -248,6 +247,7 @@ export function useOverlayState() {
 
     unsubs.push(
       listen("transcription_done", (event) => {
+        if ((event.payload as { stale?: boolean } | null)?.stale) return;
         cancelThinkPhase();
         cancelMushuHide();
         setMushuReplyText(null);

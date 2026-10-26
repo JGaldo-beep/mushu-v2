@@ -67,7 +67,8 @@ export function useDictation() {
     });
 
     const unlistenDone = listen("transcription_done", (event) => {
-      const p = event.payload as { text?: string };
+      const p = event.payload as { text?: string; stale?: boolean };
+      if (p?.stale) return;
       const hasText = !!p?.text;
       setState((s) => ({
         ...s,
