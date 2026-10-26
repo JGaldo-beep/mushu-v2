@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Check, ChevronRight, Copy, LogIn } from "lucide-react";
+import { Bot, Check, ChevronRight, Copy, LogIn, Pause } from "lucide-react";
 import { useState } from "react";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { CopyButton } from "@/components/CopyButton";
@@ -74,13 +74,14 @@ type HomePageProps = {
 };
 
 export function HomePage({ onNavigate }: HomePageProps = {}) {
-  const { status, hotkey, modeHotkey, resultText, errorMessage } = useDictation();
+  const { status, hotkey, modeHotkey, pauseHotkey, paused, resultText, errorMessage } =
+    useDictation();
   const { activeAgent } = useVoiceAgents();
   const [historyOpen, setHistoryOpen] = useState(false);
   const { items, loading } = useHistoryContext();
   const { isSignedIn, loaded: accountLoaded } = useAccountStatus();
   const isRecording = status === "recording";
-  const audioLevel = useAudioLevel(isRecording);
+  const audioLevel = useAudioLevel(isRecording && !paused);
   const showSignedOutBanner = accountLoaded && !isSignedIn;
 
   const metrics = useHomeMetrics();
@@ -88,6 +89,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
 
   const hotkeyParts = hotkey.split("+");
   const modeHotkeyParts = modeHotkey.split("+");
+  const pauseHotkeyParts = pauseHotkey.split("+");
 
   return (
     <div className="flex h-full flex-col" style={{ minHeight: 0 }}>
@@ -407,17 +409,28 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                       boxShadow: "var(--glass-highlight), var(--elev-shadow)",
                     }}
                   >
-                    <span className="relative flex size-2">
-                      <span
-                        className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
-                        style={{ background: "var(--destructive)" }}
+                    {paused ? (
+                      <Pause
+                        size={11}
+                        strokeWidth={2.75}
+                        fill="currentColor"
+                        aria-hidden
+                        style={{ color: "var(--destructive)" }}
                       />
-                      <span
-                        className="relative inline-flex size-2 rounded-full"
-                        style={{ background: "var(--destructive)" }}
-                      />
-                    </span>
+                    ) : (
+                      <span className="relative flex size-2">
+                        <span
+                          className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                          style={{ background: "var(--destructive)" }}
+                        />
+                        <span
+                          className="relative inline-flex size-2 rounded-full"
+                          style={{ background: "var(--destructive)" }}
+                        />
+                      </span>
+                    )}
                     <span
+                      role="status"
                       style={{
                         fontFamily: "'Geist Variable', sans-serif",
                         fontSize: "12px",
@@ -425,10 +438,10 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                         color: "var(--foreground)",
                       }}
                     >
-                      Listening…
+                      {paused ? "Paused" : "Listening…"}
                     </span>
                   </div>
-                  <ShortcutKbd keys={hotkeyParts} />
+                  <ShortcutKbd keys={paused ? pauseHotkeyParts : hotkeyParts} />
                   <p
                     style={{
                       fontFamily: "'Space Mono', monospace",
@@ -436,7 +449,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                       color: "var(--muted-foreground)",
                     }}
                   >
-                    Release to transcribe
+                    {paused ? "Press to resume — nothing is recorded meanwhile" : "Release to transcribe"}
                   </p>
                 </div>
               </motion.div>

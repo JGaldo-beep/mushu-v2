@@ -10,6 +10,10 @@ interface DictationState {
   errorMessage: string | null;
   hotkey: string;
   modeHotkey: string;
+  pauseHotkey: string;
+  // Recording continues while paused, but no audio is kept — the UI must say so
+  // rather than keep showing "Listening…".
+  paused: boolean;
 }
 
 const RESULT_AUTO_CLEAR_MS = 12000;
@@ -22,6 +26,8 @@ export function useDictation() {
     errorMessage: null,
     hotkey: "Ctrl+Space",
     modeHotkey: "Ctrl+Shift+M",
+    pauseHotkey: "Ctrl+Shift+P",
+    paused: false,
   });
 
   const clearTimerRef = useRef<number | null>(null);
@@ -42,6 +48,7 @@ export function useDictation() {
           ...s,
           hotkey: fs.hotkey,
           modeHotkey: fs.mode_hotkey,
+          pauseHotkey: fs.pause_hotkey,
         }));
       })
       .catch(() => {});
@@ -95,6 +102,11 @@ export function useDictation() {
       scheduleClear(ERROR_AUTO_CLEAR_MS);
     });
 
+    // main.js broadcasts false on every start, stop and cancel, so this also resets.
+    const unlistenPaused = listen("dictation_paused", (event) => {
+      setState((s) => ({ ...s, paused: Boolean(event.payload) }));
+    });
+
     const unlistenCancelled = listen("dictation_cancelled", () => {
       if (clearTimerRef.current) {
         window.clearTimeout(clearTimerRef.current);
@@ -122,6 +134,7 @@ export function useDictation() {
       unlistenError.then((f) => f());
       unlistenGroq.then((f) => f());
       unlistenCancelled.then((f) => f());
+      unlistenPaused.then((f) => f());
       if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
     };
   }, [scheduleClear]);

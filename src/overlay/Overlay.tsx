@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { Pause } from "lucide-react";
 import { MushuReplyCard } from "@/overlay/components/MushuReplyCard";
 import { ThinkingDots } from "@/overlay/components/ThinkingDots";
 import { WaveBars } from "@/overlay/components/WaveBars";
@@ -87,6 +88,21 @@ export function Overlay() {
                     <span className="inline-block min-h-4 min-w-10" aria-hidden />
                   )}
                 </motion.div>
+              ) : isPaused ? (
+                // Red still bars alone read as "can't hear you". Paused is a state the
+                // user chose, so the pill names it.
+                <motion.span
+                  key="paused"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={transition}
+                  className="overlay-paused-label"
+                  role="status"
+                >
+                  <Pause size={10} strokeWidth={3} fill="currentColor" aria-hidden />
+                  Paused
+                </motion.span>
               ) : (
                 <motion.div
                   key="wave"
@@ -97,8 +113,8 @@ export function Overlay() {
                 >
                   <WaveBars
                     level={audioLevel}
-                    color={isPaused ? "#EF4444" : "#FFFFFF"}
-                    idle={waveIdle || isPaused}
+                    color="#FFFFFF"
+                    idle={waveIdle}
                   />
                 </motion.div>
               )}
