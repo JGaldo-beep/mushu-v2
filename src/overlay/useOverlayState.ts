@@ -76,6 +76,8 @@ export function useOverlayState() {
   const [surface, setSurface] = useState<OverlaySurface>("hidden");
   const [activeVoiceAgent, setActiveVoiceAgent] = useState<string | null>(null);
   const [modeBannerOnly, setModeBannerOnly] = useState(false);
+  // Set for notices (e.g. "Mic: AirPods"); null means the banner names the voice agent.
+  const [bannerText, setBannerText] = useState<string | null>(null);
   const [mushuReplyText, setMushuReplyText] = useState<string | null>(null);
   // Bumped whenever the active voice agent changes, forcing the overlay badge
   // to re-key and replay its "pop" entrance animation.
@@ -169,8 +171,10 @@ export function useOverlayState() {
 
     unsubs.push(
       listen("overlay_mode_banner", (event) => {
-        const active = Boolean((event.payload as { active?: boolean })?.active);
+        const payload = event.payload as { active?: boolean; text?: string | null } | null;
+        const active = Boolean(payload?.active);
         setModeBannerOnly(active);
+        if (active) setBannerText(payload?.text ?? null);
         if (active) {
           cancelTranscriptionExit();
           setTranscriptionFadeOut(false);
@@ -303,6 +307,7 @@ export function useOverlayState() {
     surface,
     activeVoiceAgent,
     modeBannerOnly,
+    bannerText,
     mushuReplyText,
     modePopToken,
     isProcessing,

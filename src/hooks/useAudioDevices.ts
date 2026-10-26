@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { listMicrophones, type AudioDevice } from "@/lib/audioDevices";
 
-export interface AudioDevice {
-  deviceId: string;
-  label: string;
-}
+export type { AudioDevice };
 
 async function ensureMicPermission(): Promise<void> {
   // enumerateDevices() devuelve labels vacios sin permiso de mic.
@@ -18,23 +16,15 @@ async function ensureMicPermission(): Promise<void> {
 
 export function useAudioDevices() {
   const [devices, setDevices] = useState<AudioDevice[]>([]);
+  const [defaultLabel, setDefaultLabel] = useState<string | null>(null);
   const [needsPermission, setNeedsPermission] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
-      const all = await navigator.mediaDevices.enumerateDevices();
-      const inputs: AudioDevice[] = [];
-      let missingLabels = false;
-      for (const d of all) {
-        if (d.kind !== "audioinput") continue;
-        if (!d.label) missingLabels = true;
-        inputs.push({
-          deviceId: d.deviceId,
-          label: d.label || `Micrófono ${inputs.length + 1}`,
-        });
-      }
-      setDevices(inputs);
-      setNeedsPermission(missingLabels);
+      const list = await listMicrophones();
+      setDevices(list.devices);
+      setDefaultLabel(list.defaultLabel);
+      setNeedsPermission(list.missingLabels);
     } catch (err) {
       console.warn("[useAudioDevices] enumerate failed:", err);
     }
@@ -56,5 +46,5 @@ export function useAudioDevices() {
     };
   }, [refresh]);
 
-  return { devices, refresh, needsPermission };
+  return { devices, defaultLabel, refresh, needsPermission };
 }

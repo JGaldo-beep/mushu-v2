@@ -31,6 +31,8 @@ export type FrontendState = {
   has_deepgram_direct_key: boolean;
   microphones: string[];
   selected_microphone: string | null;
+  selected_microphone_label: string | null;
+  auto_switch_microphone: boolean;
   theme: ThemePref;
   sound_effects_enabled: boolean;
   sound_effects_volume: number;
@@ -79,6 +81,8 @@ export type SaveSettingsInput = {
   processing_mode: ProcessingMode;
   transcription_provider: TranscriptionProvider;
   selected_microphone: string | null;
+  selected_microphone_label?: string | null;
+  auto_switch_microphone?: boolean;
   theme: ThemePref;
   sound_effects_enabled: boolean;
   sound_effects_volume: number;

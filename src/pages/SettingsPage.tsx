@@ -289,7 +289,11 @@ function HotkeyCapture({
 export function SettingsPage() {
   const { draft, loading, saving, isDirty, setField, save, reset, refresh } = useSettings();
   const { language, setLanguage } = useSpokenLanguage();
-  const { devices: audioDevices, refresh: refreshAudioDevices } = useAudioDevices();
+  const {
+    devices: audioDevices,
+    defaultLabel: defaultMicLabel,
+    refresh: refreshAudioDevices,
+  } = useAudioDevices();
   const ready = !loading && !!draft;
 
   const [dgKeyInput, setDgKeyInput] = useState("");
@@ -350,10 +354,30 @@ export function SettingsPage() {
     toast.success("Microphone list refreshed");
   };
 
+  // A chosen microphone that is not connected shows as "System default" — that is what
+  // records (main.js also resets the setting on unplug). Never a blank select.
+  const selectedMicId = draft?.selected_microphone ?? null;
+  const micValue =
+    selectedMicId !== null && audioDevices.some((d) => d.deviceId === selectedMicId)
+      ? selectedMicId
+      : "__default__";
   const micOptions = [
-    { value: "__default__", label: "System default" },
+    {
+      value: "__default__",
+      label: defaultMicLabel ? `System default — ${defaultMicLabel}` : "System default",
+    },
     ...audioDevices.map((d) => ({ value: d.deviceId, label: d.label })),
   ];
+  const onSelectMic = (value: string) => {
+    if (value === "__default__") {
+      setField("selected_microphone", null);
+      setField("selected_microphone_label", null);
+      return;
+    }
+    setField("selected_microphone", value);
+    const device = audioDevices.find((d) => d.deviceId === value);
+    if (device) setField("selected_microphone_label", device.label);
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -437,13 +461,13 @@ export function SettingsPage() {
             />
             <SettingRow
               label="Microphone"
-              description="System default if you don't pick one."
+              description="System default if you don't pick one, or when yours is disconnected."
               control={
                 <div className="flex items-center gap-2">
                   <GlassSelect
-                    value={draft?.selected_microphone ?? "__default__"}
+                    value={micValue}
                     options={micOptions}
-                    onChange={(v) => setField("selected_microphone", v === "__default__" ? null : v)}
+                    onChange={onSelectMic}
                     className="w-56"
                   />
                   <button
@@ -455,6 +479,16 @@ export function SettingsPage() {
                     <RefreshCw style={{ width: "14px", height: "14px" }} />
                   </button>
                 </div>
+              }
+            />
+            <SettingRow
+              label="Switch to new microphones"
+              description="Use headphones or a mic as soon as you connect them."
+              control={
+                <GlassToggle
+                  value={draft?.auto_switch_microphone ?? true}
+                  onChange={(v) => setField("auto_switch_microphone", v)}
+                />
               }
             />
             <SettingRow

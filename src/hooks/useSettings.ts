@@ -66,6 +66,8 @@ export function useSettings() {
         processing_mode: draft.processing_mode,
         transcription_provider: draft.transcription_provider,
         selected_microphone: draft.selected_microphone,
+        selected_microphone_label: draft.selected_microphone_label ?? null,
+        auto_switch_microphone: draft.auto_switch_microphone ?? true,
         theme: fresh.theme,
         sound_effects_enabled: draft.sound_effects_enabled,
         sound_effects_volume: draft.sound_effects_volume,

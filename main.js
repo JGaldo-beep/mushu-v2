@@ -94,7 +94,11 @@ const DEFAULT_SETTINGS = {
   model: "whisper-large-v3-turbo",
   processing_mode: "cloud_first",
   transcription_provider: "deepgram",
+  // The chosen microphone; null = system default. Reset to null when it is unplugged.
   selected_microphone: null,
+  selected_microphone_label: null,
+  // Select a newly connected microphone (e.g. headphones) automatically.
+  auto_switch_microphone: true,
   // The brand is black-first ("Onda en vidrio"); light stays one click away.
   theme: "dark",
   sound_effects_enabled: true,
@@ -1067,15 +1071,59 @@ function matchesShortcut(evt, shortcut) {
   );
 }
 
-function showOverlayBanner() {
+// Without `text` the banner names the active voice agent; with it, any short notice.
+function showOverlayBanner(text = null, durationMs = 1100) {
   showOverlay();
-  broadcast("overlay_mode_banner", { active: true });
+  broadcast("overlay_mode_banner", { active: true, text });
   if (modeBannerTimer) clearTimeout(modeBannerTimer);
   modeBannerTimer = setTimeout(() => {
     modeBannerTimer = null;
     broadcast("overlay_mode_banner", { active: false });
     if (!recording) hideOverlay();
-  }, 1100);
+  }, durationMs);
+}
+
+// The overlay watches audio inputs (it holds the microphone permission and is always
+// alive) and reports what was plugged in or out, plus the full list once at startup.
+// A chosen microphone that is not connected falls back to the system default (the
+// setting itself is reset, so the UI shows "System default"); with auto-switch on,
+// plugging it back in selects it again.
+async function handleAudioInputsChanged({ added = [], removed = [], present = null, defaultLabel = null } = {}) {
+  const selected = settings.selected_microphone;
+  let notice = null;
+
+  const resetToDefault = async () => {
+    settings.selected_microphone = null;
+    settings.selected_microphone_label = null;
+    await persistState();
+    broadcast("frontend_state_changed", {});
+  };
+
+  // Startup: the chosen microphone was unplugged while Mushu was closed.
+  if (present && selected && !present.includes(selected)) {
+    console.info("[mic] selected microphone not connected at startup — using system default");
+    await resetToDefault();
+    return;
+  }
+
+  if (settings.auto_switch_microphone && added.length > 0) {
+    const pick = added[added.length - 1];
+    if (pick?.deviceId) {
+      settings.selected_microphone = String(pick.deviceId);
+      settings.selected_microphone_label = String(pick.label || "").trim() || null;
+      await persistState();
+      broadcast("frontend_state_changed", {});
+      notice = `Mic: ${settings.selected_microphone_label || "new microphone"}`;
+      console.info(`[mic] auto-selected newly connected input: ${settings.selected_microphone_label}`);
+    }
+  } else if (selected && removed.includes(selected)) {
+    console.info("[mic] selected microphone disconnected — back to system default");
+    await resetToDefault();
+    notice = defaultLabel ? `Mic: System default · ${defaultLabel}` : "Mic: System default";
+  }
+
+  // Never cover the wave of a dictation in progress; the change applies to the next one.
+  if (notice && !recording) showOverlayBanner(notice, 1800);
 }
 
 function startAudioLevelEvents() {
@@ -2233,6 +2281,14 @@ function registerIpc(updateTrayMenu) {
         broadcast("voice_agent_changed", getActiveVoiceAgent());
         return getFrontendState();
       }
+      case "audio_inputs_changed":
+        await handleAudioInputsChanged({
+          added: Array.isArray(args.added) ? args.added : [],
+          removed: Array.isArray(args.removed) ? args.removed.map(String) : [],
+          present: Array.isArray(args.present) ? args.present.map(String) : null,
+          defaultLabel: args.defaultLabel ? String(args.defaultLabel) : null,
+        });
+        return;
       case "set_active_voice_agent": {
         const id = args.id == null ? null : String(args.id);
         settings.active_voice_agent_id = id && settings.voice_agents.some((a) => a.id === id) ? id : null;

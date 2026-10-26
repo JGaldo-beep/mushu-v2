@@ -108,17 +108,31 @@ export function useCaptureBridge() {
       const t0 = performance.now();
       const since = () => `+${Math.round(performance.now() - t0)}ms`;
 
-      const stream = await withTimeout(navigator.mediaDevices.getUserMedia({
-        audio: {
-          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      }), BUILD_TIMEOUT_MS, "getUserMedia", (late) => {
-        // Resolved after we gave up on it: hand the microphone straight back.
-        for (const track of late.getTracks()) track.stop();
-      });
+      const openMic = (id: string | null) =>
+        withTimeout(navigator.mediaDevices.getUserMedia({
+          audio: {
+            ...(id ? { deviceId: { exact: id } } : {}),
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        }), BUILD_TIMEOUT_MS, "getUserMedia", (late) => {
+          // Resolved after we gave up on it: hand the microphone straight back.
+          for (const track of late.getTracks()) track.stop();
+        });
+
+      let stream: MediaStream;
+      try {
+        stream = await openMic(deviceId);
+      } catch (error) {
+        // The preferred microphone (say, headphones) is not plugged in. Asking for it
+        // `exact` failed every dictation until it came back; use the system default
+        // instead. The devicechange listener rebuilds onto it when it returns.
+        const name = error instanceof Error ? error.name : "";
+        if (!deviceId || (name !== "OverconstrainedError" && name !== "NotFoundError")) throw error;
+        console.warn("[capture] el micrófono preferido no está conectado — usando el predeterminado");
+        stream = await openMic(null);
+      }
       console.info(`[capture] getUserMedia listo ${since()}`);
       streamRef.current = stream;
       // The device went away (unplugged, sleep, driver reset). Drop the pipeline so the

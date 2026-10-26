@@ -5,6 +5,7 @@ import { ThinkingDots } from "@/overlay/components/ThinkingDots";
 import { WaveBars } from "@/overlay/components/WaveBars";
 import { useAudioLevel } from "@/overlay/useAudioLevel";
 import { useCaptureBridge } from "@/overlay/useCaptureBridge";
+import { useMicrophoneWatcher } from "@/overlay/useMicrophoneWatcher";
 import { useOverlayState } from "@/overlay/useOverlayState";
 import { cn } from "@/lib/utils";
 
@@ -16,9 +17,11 @@ const transition = { duration: 0.22, ease } as const;
 // rest it shows still dots and does nothing at all, which is the whole point.
 export function Overlay() {
   useCaptureBridge();
+  useMicrophoneWatcher();
   const {
     activeVoiceAgent,
     modeBannerOnly,
+    bannerText,
     mushuReplyText,
     modePopToken,
     isProcessing,
@@ -72,7 +75,7 @@ export function Overlay() {
                   transition={transition}
                   className="overlay-agent-label"
                 >
-                  {activeVoiceAgent ?? "General"}
+                  {bannerText ?? activeVoiceAgent ?? "General"}
                 </motion.span>
               ) : isProcessing ? (
                 <motion.div
