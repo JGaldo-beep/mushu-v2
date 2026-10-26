@@ -25,8 +25,8 @@ export function GlassToggle({ value, onChange, disabled }: GlassToggleProps) {
           ? "color-mix(in oklab, var(--primary) 55%, transparent)"
           : "color-mix(in oklab, var(--foreground) 10%, transparent)",
         boxShadow: value
-          ? "inset 0 1px 0 rgba(255,255,255,0.45), 0 0 12px color-mix(in oklab, var(--primary) 30%, transparent)"
-          : "inset 0 1px 0 rgba(255,255,255,0.05)",
+          ? "inset 0 1px 0 rgba(255,255,255,0.45), 0 0 12px color-mix(in oklab, var(--primary) 18%, transparent)"
+          : "var(--glass-highlight)",
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
         transition: "background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease",
@@ -39,7 +39,9 @@ export function GlassToggle({ value, onChange, disabled }: GlassToggleProps) {
           width: "16px",
           height: "16px",
           borderRadius: "50%",
-          background: "#ffffff",
+          // Primary is the foreground itself (white in dark mode), so the knob takes the
+          // inverse colour when on; off, a muted grey reads as "inactive" in both themes.
+          background: value ? "var(--primary-foreground)" : "var(--muted-foreground)",
           transform: `translateX(${value ? "19px" : "3px"})`,
           transition: "transform 0.2s ease",
           boxShadow: "0 1px 3px rgba(0,0,0,0.40)",

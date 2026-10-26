@@ -161,9 +161,10 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
             role="status"
             className="flex items-center gap-3 px-4 py-3"
             style={{
-              border: "0.5px solid var(--border)",
-              borderRadius: "var(--radius)",
               background: "var(--card)",
+              border: "1px solid var(--glass-edge)",
+              borderRadius: "calc(var(--radius) * 1.3)",
+              boxShadow: "var(--glass-highlight), var(--elev-shadow)",
             }}
           >
             <div
@@ -271,9 +272,10 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
         <div
           className="mt-5 flex flex-col items-center gap-7 px-4 py-10"
           style={{
-            border: "0.5px solid var(--border)",
-            borderRadius: "var(--radius)",
             background: "var(--card)",
+            border: "1px solid var(--glass-edge)",
+            borderRadius: "calc(var(--radius) * 1.3)",
+            boxShadow: "var(--glass-highlight), var(--elev-shadow)",
             minHeight: "260px",
           }}
         >
@@ -400,8 +402,9 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     className="flex items-center gap-2 px-3 py-1"
                     style={{
                       background: "var(--card)",
-                      border: "0.5px solid var(--border)",
-                      borderRadius: "var(--radius)",
+                      border: "1px solid var(--glass-edge)",
+                      borderRadius: "calc(var(--radius) * 1.3)",
+                      boxShadow: "var(--glass-highlight), var(--elev-shadow)",
                     }}
                   >
                     <span className="relative flex size-2">
@@ -488,8 +491,9 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   className="relative overflow-hidden p-5"
                   style={{
                     background: "var(--card)",
-                    border: "0.5px solid var(--border)",
-                    borderRadius: "var(--radius)",
+                    border: "1px solid var(--glass-edge)",
+                    borderRadius: "calc(var(--radius) * 1.3)",
+                    boxShadow: "var(--glass-highlight), var(--elev-shadow)",
                   }}
                 >
                   <div className="mb-3 flex items-center justify-between gap-2">
@@ -606,9 +610,10 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
             <div
               className="p-6 text-center"
               style={{
-                border: "0.5px solid var(--border)",
-                borderRadius: "var(--radius)",
                 background: "var(--card)",
+                border: "1px solid var(--glass-edge)",
+                borderRadius: "calc(var(--radius) * 1.3)",
+                boxShadow: "var(--glass-highlight), var(--elev-shadow)",
               }}
             >
               <p
@@ -626,9 +631,10 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
             <div
               className="overflow-hidden"
               style={{
-                border: "0.5px solid var(--border)",
-                borderRadius: "var(--radius)",
                 background: "var(--card)",
+                border: "1px solid var(--glass-edge)",
+                borderRadius: "calc(var(--radius) * 1.3)",
+                boxShadow: "var(--glass-highlight), var(--elev-shadow)",
               }}
             >
               {recentHistory.map((item, i) => {

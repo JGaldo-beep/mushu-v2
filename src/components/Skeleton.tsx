@@ -10,8 +10,8 @@ export function Skeleton({ className, style }: SkeletonProps) {
     <div
       className={cn("animate-pulse rounded-[10px]", className)}
       style={{
-        background: "rgba(255,255,255,0.05)",
-        border: "0.5px solid rgba(255,255,255,0.04)",
+        background: "color-mix(in oklab, var(--foreground) 5%, transparent)",
+        border: "1px solid var(--glass-edge)",
         ...style,
       }}
     />

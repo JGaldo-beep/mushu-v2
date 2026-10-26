@@ -175,8 +175,8 @@ function KeyChips({ combo, dim }: { combo: string; dim?: boolean }) {
               fontWeight: 700,
               padding: "3px 7px",
               borderRadius: "5px",
-              background: dim ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.09)",
-              border: "0.5px solid rgba(255,255,255,0.13)",
+              background: dim ? "var(--glass-surface)" : "var(--glass-surface-strong)",
+              border: "1px solid var(--glass-edge)",
               color: dim ? "var(--text-muted)" : "var(--text-primary)",
               letterSpacing: "0.01em",
               boxShadow: "0 1px 0 rgba(0,0,0,0.25)",
@@ -570,7 +570,8 @@ export function SettingsPage() {
                         fontFamily: "'Geist Variable', sans-serif",
                         fontSize: "12px",
                         fontWeight: 500,
-                        color: "rgb(251,146,60)",
+                        // Destructive action: the verified token (orange read 2.2:1 on light).
+                        color: "var(--destructive)",
                       }}
                     >
                       Deactivate
@@ -762,9 +763,9 @@ export function SettingsPage() {
                     fontFamily: "'Space Mono', monospace",
                     fontSize: "10px",
                     fontWeight: 700,
-                    background: "rgba(22,163,74,0.10)",
-                    border: "0.5px solid rgba(22,163,74,0.30)",
-                    color: "var(--delta-green)",
+                    background: "var(--glass-surface-strong)",
+                    border: "1px solid var(--glass-edge)",
+                    color: "var(--foreground)",
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
                   }}

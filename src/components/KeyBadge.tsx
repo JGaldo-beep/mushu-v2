@@ -25,10 +25,9 @@ export function KeyBadge({ keys }: KeyBadgeProps) {
               fontSize: "11px",
               fontWeight: 700,
               color: "var(--text-secondary)",
-              background: "rgba(255,255,255,0.06)",
-              border: "0.5px solid rgba(255,255,255,0.10)",
-              boxShadow:
-                "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 1px rgba(0,0,0,0.30)",
+              background: "var(--glass-surface-strong)",
+              border: "1px solid var(--glass-edge)",
+              boxShadow: "var(--glass-highlight), 0 1px 1px rgba(0,0,0,0.25)",
               borderRadius: "6px",
               padding: "2px 7px",
               display: "inline-block",

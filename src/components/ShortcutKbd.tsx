@@ -9,10 +9,9 @@ function Key({ children, size = "md" }: { children: ReactNode; size?: "sm" | "md
         size === "md" ? "h-7 min-w-7 px-2 text-[12px]" : "h-5 min-w-5 px-1.5 text-[10px]",
       )}
       style={{
-        background: "rgba(255,255,255,0.06)",
-        border: "0.5px solid rgba(255,255,255,0.10)",
-        boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.10), 0 1px 1px rgba(0,0,0,0.30)",
+        background: "var(--glass-surface-strong)",
+        border: "1px solid var(--glass-edge)",
+        boxShadow: "var(--glass-highlight), 0 1px 1px rgba(0,0,0,0.25)",
         color: "var(--text-secondary)",
         fontWeight: 600,
         letterSpacing: "0.02em",

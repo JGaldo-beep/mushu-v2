@@ -95,7 +95,8 @@ const DEFAULT_SETTINGS = {
   processing_mode: "cloud_first",
   transcription_provider: "deepgram",
   selected_microphone: null,
-  theme: "system",
+  // The brand is black-first ("Onda en vidrio"); light stays one click away.
+  theme: "dark",
   sound_effects_enabled: true,
   sound_effects_volume: 0.22,
   stop_on_enter: false,

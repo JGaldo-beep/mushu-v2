@@ -12,8 +12,9 @@ import { cn } from "@/lib/utils";
 const STEPS = ["welcome", "mic", "shortcuts", "signin", "done"] as const;
 const STEP_COUNT = STEPS.length;
 
-// Brand greens plus the warm neutrals they sit on — grayscale confetti is a contradiction.
-const CONFETTI_COLORS = ["#64AA84", "#8FBFA6", "#3F6B55", "#C6DACC", "#E3EDE6", "#EDE6DB"];
+// The brand is monochrome glass, so the confetti is too: whites and greys from the logo's
+// bars, with the darker greys there so it still shows up over the light theme.
+const CONFETTI_COLORS = ["#FFFFFF", "#E4E4E7", "#C9C9CF", "#A1A1AA", "#71717A", "#3F3F46"];
 type ConfettiStyle = CSSProperties & {
   "--tx": string;
   "--ty": string;

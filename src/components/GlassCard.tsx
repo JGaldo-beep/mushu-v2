@@ -9,10 +9,23 @@ interface GlassCardProps {
   variant?: "default" | "strong" | "subtle";
 }
 
-const VARIANT_BG: Record<NonNullable<GlassCardProps["variant"]>, string> = {
-  default: "var(--card)",
-  strong: "var(--card)",
-  subtle: "transparent",
+// Translucent surfaces over the near-black ground; see the --glass-* tokens in
+// styles/design-tokens.css.
+const VARIANT_STYLE: Record<NonNullable<GlassCardProps["variant"]>, CSSProperties> = {
+  default: {
+    background: "var(--glass-surface)",
+    border: "1px solid var(--glass-edge)",
+    boxShadow: "var(--glass-highlight), var(--elev-shadow)",
+  },
+  strong: {
+    background: "var(--glass-surface-strong)",
+    border: "1px solid var(--glass-edge)",
+    boxShadow: "var(--glass-highlight), var(--elev-shadow)",
+  },
+  subtle: {
+    background: "transparent",
+    border: "1px solid var(--glass-edge)",
+  },
 };
 
 export function GlassCard({
@@ -24,10 +37,9 @@ export function GlassCard({
 }: GlassCardProps) {
   return (
     <div
-      className={cn("rounded-md", className)}
+      className={cn("rounded-xl", className)}
       style={{
-        background: VARIANT_BG[variant],
-        border: "0.5px solid var(--border)",
+        ...VARIANT_STYLE[variant],
         ...style,
       }}
       onClick={onClick}

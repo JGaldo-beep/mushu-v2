@@ -3,114 +3,112 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Mushu brand palette — warm neutrals + sage, mirrored from the `mushu-landing` repo.
+/* Mushu palette — "Onda en vidrio": near-monochrome, black-first, glass surfaces.
  *
- * The landing's hues are kept; its contrast is not. Measured against WCAG 2.1 AA, the
- * landing's light mode fails where it matters most in an app: sage #81B09A carries only
- * 2.38:1 against cream, so a primary button's label is unreadable, and its borders sit at
- * 1.28:1 (invisible). Sage is a mid-tone — it sings on warm black and disappears on cream.
- * So light mode uses a darkened sage (#3F6B55, 5.75:1) while dark mode keeps the brand
- * tone lifted slightly (#8FBFA6, 9.34:1). Every pair below is verified.
+ * The brand is the logo: white voice bars on dark glass. So there is no chromatic
+ * accent — primary is the foreground itself (white on dark, black on light), the way
+ * Superwhisper and other premium dictation tools carry it. Colour is reserved for
+ * meaning (destructive red). Every text pair below is measured against WCAG 2.1 AA:
  *
- * --border is a decorative divider (~1.8:1). --input is a form-control boundary and is
- * held to 3:1 per SC 1.4.11 — they are deliberately different weights. */
+ *   dark   foreground 17.0:1 · muted-foreground 7.3:1 (6.9:1 on card) · destructive 6.9:1
+ *   light  foreground 19.0:1 · muted-foreground 6.0:1 (5.4:1 on accent) · destructive 5.2:1
+ *
+ * --border is a decorative divider. --input is a form-control boundary held to 3:1
+ * (SC 1.4.11) — they are deliberately different weights. Translucent surfaces
+ * (--glass-*) live in styles/design-tokens.css. */
 
 :root {
-  /* This project derives its scale up to 4x the base (see @theme inline below), unlike
-   * mushu-landing whose scale tops out at 1.4x. So the landing's 1.25rem would round
-   * everything here ~3x harder than intended. 0.625rem lands the same softness. */
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
-  --background: #FBF8F1;
-  --foreground: #2E2C2A;
+  --background: #FAFAFA;
+  --foreground: #0A0A0B;
 
   --card: #FFFFFF;
-  --card-foreground: #2E2C2A;
+  --card-foreground: #0A0A0B;
 
   --popover: #FFFFFF;
-  --popover-foreground: #2E2C2A;
+  --popover-foreground: #0A0A0B;
 
-  --primary: #3F6B55;
-  --primary-foreground: #FBF8F1;
+  --primary: #0A0A0B;
+  --primary-foreground: #FAFAFA;
 
-  --secondary: #F2EDE3;
-  --secondary-foreground: #2E2C2A;
+  --secondary: #F4F4F5;
+  --secondary-foreground: #0A0A0B;
 
-  --muted: #F2EDE3;
-  --muted-foreground: #6B645B;
+  --muted: #F4F4F5;
+  --muted-foreground: #60606A;
 
-  --accent: #E3EDE6;
-  --accent-foreground: #2F5544;
+  --accent: #EEEEF0;
+  --accent-foreground: #0A0A0B;
 
-  --destructive: #A8453A;
-  --destructive-foreground: #FBF8F1;
+  --destructive: #C2362F;
+  --destructive-foreground: #FAFAFA;
 
-  --border: #C2BBAD;
-  --input: #969085;
-  --ring: #3F6B55;
+  --border: #E4E4E7;
+  --input: #8A8A93;
+  --ring: #52525B;
 
-  --chart-1: #3F6B55;
-  --chart-2: #5C8B72;
-  --chart-3: #81B09A;
-  --chart-4: #A9C9B7;
-  --chart-5: #CFE0D5;
+  --chart-1: #0A0A0B;
+  --chart-2: #3F3F46;
+  --chart-3: #71717A;
+  --chart-4: #A1A1AA;
+  --chart-5: #D4D4D8;
 
-  --sidebar: #F5F0E6;
-  --sidebar-foreground: #2E2C2A;
-  --sidebar-primary: #3F6B55;
-  --sidebar-primary-foreground: #FBF8F1;
-  --sidebar-accent: #E3EDE6;
-  --sidebar-accent-foreground: #2F5544;
-  --sidebar-border: #DCD3C3;
-  --sidebar-ring: #3F6B55;
+  --sidebar: #F4F4F5;
+  --sidebar-foreground: #0A0A0B;
+  --sidebar-primary: #0A0A0B;
+  --sidebar-primary-foreground: #FAFAFA;
+  --sidebar-accent: #E8E8EB;
+  --sidebar-accent-foreground: #0A0A0B;
+  --sidebar-border: #E4E4E7;
+  --sidebar-ring: #52525B;
 }
 
 .dark {
-  --background: #0F0E0D;
-  --foreground: #F0EDE8;
+  --background: #09090B;
+  --foreground: #EDEDEF;
 
-  --card: #1A1917;
-  --card-foreground: #F0EDE8;
+  /* Translucent on purpose: over --background it composites to exactly #111113 (the
+   * figure the contrast checks use) while letting the ambient light show through. */
+  --card: rgba(255, 255, 255, 0.035);
+  --card-foreground: #EDEDEF;
 
-  --popover: #1A1917;
-  --popover-foreground: #F0EDE8;
+  --popover: #141416;
+  --popover-foreground: #EDEDEF;
 
-  /* The logo's own green (LogoIcon.tsx), 7.00:1 on this background. Light mode uses
-   * #3F6B55 — the same hue and saturation, darkened, because this green only carries
-   * 2.60:1 against cream. */
-  --primary: #64AA84;
-  --primary-foreground: #0F0E0D;
+  --primary: #F4F4F5;
+  --primary-foreground: #09090B;
 
-  --secondary: #2A2724;
-  --secondary-foreground: #F0EDE8;
+  --secondary: #1A1A1D;
+  --secondary-foreground: #EDEDEF;
 
-  --muted: #1F1E1C;
-  --muted-foreground: #9B948C;
+  --muted: #141416;
+  --muted-foreground: #9C9CA3;
 
-  --accent: #2A3830;
-  --accent-foreground: #C6DACC;
+  --accent: #1C1C1F;
+  --accent-foreground: #F4F4F5;
 
-  --destructive: #E07A6E;
-  --destructive-foreground: #0F0E0D;
+  --destructive: #F07171;
+  --destructive-foreground: #09090B;
 
-  --border: #413E3A;
-  --input: #625E5B;
-  --ring: #64AA84;
+  --border: #222226;
+  --input: #66666E;
+  --ring: #A1A1AA;
 
-  --chart-1: #64AA84;
-  --chart-2: #8FBFA6;
-  --chart-3: #4A8465;
-  --chart-4: #C6DACC;
-  --chart-5: #E3EDE6;
+  --chart-1: #F4F4F5;
+  --chart-2: #A1A1AA;
+  --chart-3: #71717A;
+  --chart-4: #52525B;
+  --chart-5: #3F3F46;
 
-  --sidebar: #141312;
-  --sidebar-foreground: #F0EDE8;
-  --sidebar-primary: #64AA84;
-  --sidebar-primary-foreground: #0F0E0D;
-  --sidebar-accent: #2A3830;
-  --sidebar-accent-foreground: #C6DACC;
-  --sidebar-border: #2C2A27;
-  --sidebar-ring: #64AA84;
+  --sidebar: #0C0C0E;
+  --sidebar-foreground: #EDEDEF;
+  --sidebar-primary: #F4F4F5;
+  --sidebar-primary-foreground: #09090B;
+  --sidebar-accent: #1A1A1D;
+  --sidebar-accent-foreground: #F4F4F5;
+  --sidebar-border: #1C1C1F;
+  --sidebar-ring: #A1A1AA;
 }
 
 @theme inline {

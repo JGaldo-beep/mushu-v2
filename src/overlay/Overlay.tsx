@@ -11,7 +11,7 @@ const ease = [0.33, 1, 0.68, 1] as const;
 const transition = { duration: 0.22, ease } as const;
 
 // The pill carries one thing at a time: the wave, the thinking dots, or the agent
-// name for a moment after it changes. No badge, no icons, no live transcript — at
+// name for a moment after it changes. No badge, no logo, no live transcript — at
 // rest it shows still dots and does nothing at all, which is the whole point.
 export function Overlay() {
   useCaptureBridge();

@@ -18,7 +18,8 @@ export function AppShell({ children, section, onSectionChange }: AppShellProps) 
         width: "100vw",
         height: "100vh",
         overflow: "hidden",
-        background: "var(--background)",
+        // A faint pool of light at the top gives the glass surfaces something to catch.
+        background: "var(--ambient), var(--background)",
       }}
     >
       <div
