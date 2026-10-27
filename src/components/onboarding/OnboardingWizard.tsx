@@ -805,8 +805,8 @@ function SignInStep({
         className="text-muted-foreground"
         style={{ fontSize: "11.5px", lineHeight: 1.5 }}
       >
-        Or skip — you can activate any time from{" "}
-        <span className="text-foreground">Settings → Account</span>.
+        You can skip this for now, but dictation needs an account. Sign in any time
+        from <span className="text-foreground">Settings → Account</span>.
       </p>
     </>
   );
@@ -829,7 +829,7 @@ function DoneStep({
 }) {
   return (
     <>
-      <StepHeader numeral="05" title="You're all set" />
+      <StepHeader numeral="05" title={signedInEmail ? "You're all set" : "Almost there"} />
       <p
         className="text-foreground/80"
         style={{ fontSize: "14.5px", lineHeight: 1.6, maxWidth: "52ch" }}
@@ -853,8 +853,9 @@ function DoneStep({
           </>
         ) : (
           <>
-            Mushu is ready to use on this device. Sign in any time from{" "}
-            <span className="text-foreground">Settings → Account</span>.
+            One step left: sign in from{" "}
+            <span className="text-foreground">Settings → Account</span>. Dictation stays off
+            until you do.
           </>
         )}
       </p>

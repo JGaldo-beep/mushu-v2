@@ -1893,8 +1893,25 @@ async function cycleActiveVoiceAgent() {
   showOverlayBanner();
 }
 
+// Transcription goes through the Mushu backend, which needs a session. The only way to
+// dictate signed out is a personal Deepgram key (direct stream, no backend).
+function canDictate() {
+  if (secrets.mushu_session?.access_token) return true;
+  return settings.transcription_provider === "deepgram" && Boolean(getDeepgramApiKey());
+}
+
 function startRecording({ handsOffMode = false } = {}) {
   if (recording) return;
+  if (!canDictate()) {
+    // Refuse up front instead of recording audio that can only fail at the end.
+    showOverlayBanner("Sign in to dictate", 2400);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    return;
+  }
   recording = true;
   recordingSeq += 1;
   paused = false;
