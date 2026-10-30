@@ -7,6 +7,8 @@ import { useAudioLevel } from "@/overlay/useAudioLevel";
 import { useCaptureBridge } from "@/overlay/useCaptureBridge";
 import { useMicrophoneWatcher } from "@/overlay/useMicrophoneWatcher";
 import { useOverlayState } from "@/overlay/useOverlayState";
+import { useCopy } from "@/i18n";
+import { overlayCopy } from "@/i18n/overlay";
 import { cn } from "@/lib/utils";
 
 const ease = [0.33, 1, 0.68, 1] as const;
@@ -16,6 +18,7 @@ const transition = { duration: 0.22, ease } as const;
 // name for a moment after it changes. No badge, no logo, no live transcript — at
 // rest it shows still dots and does nothing at all, which is the whole point.
 export function Overlay() {
+  const t = useCopy(overlayCopy);
   useCaptureBridge();
   useMicrophoneWatcher();
   const {
@@ -75,7 +78,7 @@ export function Overlay() {
                   transition={transition}
                   className="overlay-agent-label"
                 >
-                  {bannerText ?? activeVoiceAgent ?? "General"}
+                  {bannerText ?? activeVoiceAgent ?? t.general}
                 </motion.span>
               ) : isProcessing ? (
                 <motion.div
@@ -104,7 +107,7 @@ export function Overlay() {
                   role="status"
                 >
                   <Pause size={10} strokeWidth={3} fill="currentColor" aria-hidden />
-                  Paused
+                  {t.paused}
                 </motion.span>
               ) : (
                 <motion.div

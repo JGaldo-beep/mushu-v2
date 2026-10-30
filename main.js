@@ -111,7 +111,84 @@ const DEFAULT_SETTINGS = {
   spoken_language: "auto",
   voice_agents: [],
   active_voice_agent_id: null,
+  // Language of the app's own text: "auto" follows Windows, or "es" / "en". Not the
+  // language the user dictates in; that is `spoken_language`.
+  ui_language: "auto",
 };
+
+// Text the main process shows itself: the tray menu, overlay banners and the errors
+// that reach the user. Everything in the windows lives in src/i18n.
+const MAIN_COPY = {
+  en: {
+    trayAgent: (name) => `Agent: ${name}`,
+    trayGeneral: "Mode: General",
+    trayShow: "Show Mushu",
+    trayHandsOff: "Toggle hands-off dictation",
+    trayCycle: "Next voice agent",
+    trayQuit: "Quit",
+    signInToDictate: "Sign in to dictate",
+    micNew: (label) => `Mic: ${label || "new microphone"}`,
+    micDefault: (label) => (label ? `Mic: System default · ${label}` : "Mic: System default"),
+    signInForTrial: "Sign in to Mushu to use the trial.",
+    sessionExpired: "Your Mushu session expired. Please sign in again.",
+    noAudio: "No audio captured from the microphone. Check microphone permissions in Windows.",
+    audioTooShort: "The captured audio is empty or too short.",
+    transcriptionFailed: "Transcription failed. Check your connection.",
+    deepgramStreamError: "Deepgram stream error.",
+    transcription: (provider) => `${provider} transcription`,
+    emptyAgentReply: "The agent returned an empty reply.",
+    agentNeedsName: "The agent needs a name.",
+    agentNeedsInstruction: "The agent needs an instruction.",
+    writeInstructionFirst: "Write an instruction first.",
+    couldNotImprove: "Couldn't improve the instruction.",
+    groqReady: "Groq ready via the Mushu backend.",
+    groqSignIn: "Sign in to use Groq via the backend.",
+    deepgramDirect: "Direct Deepgram ready (nova-3, multilingual, smart formatting, numerals, punctuation).",
+    deepgramBackend: "Deepgram via the Mushu backend. Add your API key for a direct connection.",
+    deepgramSignIn: "Sign in or add your Deepgram API key.",
+  },
+  es: {
+    trayAgent: (name) => `Agente: ${name}`,
+    trayGeneral: "Modo: General",
+    trayShow: "Mostrar Mushu",
+    trayHandsOff: "Dictado manos libres",
+    trayCycle: "Siguiente agente de voz",
+    trayQuit: "Salir",
+    signInToDictate: "Inicia sesión para dictar",
+    micNew: (label) => `Micrófono: ${label || "micrófono nuevo"}`,
+    micDefault: (label) =>
+      label ? `Micrófono: el del sistema · ${label}` : "Micrófono: el del sistema",
+    signInForTrial: "Inicia sesión en Mushu para usar la prueba.",
+    sessionExpired: "Tu sesión de Mushu expiró. Vuelve a iniciar sesión.",
+    noAudio: "No llegó audio del micrófono. Revisa los permisos del micrófono en Windows.",
+    audioTooShort: "El audio está vacío o es demasiado corto.",
+    transcriptionFailed: "No se pudo transcribir. Revisa tu conexión.",
+    deepgramStreamError: "Error en la conexión con Deepgram.",
+    transcription: (provider) => `Transcripción con ${provider}`,
+    emptyAgentReply: "El agente devolvió una respuesta vacía.",
+    agentNeedsName: "El agente necesita un nombre.",
+    agentNeedsInstruction: "El agente necesita una instrucción.",
+    writeInstructionFirst: "Escribe una instrucción primero.",
+    couldNotImprove: "No se pudo mejorar la instrucción.",
+    groqReady: "Groq listo a través del servidor de Mushu.",
+    groqSignIn: "Inicia sesión para usar Groq a través del servidor.",
+    deepgramDirect: "Deepgram directo listo (nova-3, varios idiomas, formato, números y puntuación).",
+    deepgramBackend: "Deepgram a través del servidor de Mushu. Agrega tu clave de API para conectarte directo.",
+    deepgramSignIn: "Inicia sesión o agrega tu clave de API de Deepgram.",
+  },
+};
+
+// "auto" picks Spanish for any Spanish variant of Windows (es-ES, es-MX, es-419…) and
+// English for everything else.
+function resolveUiLanguage() {
+  if (settings.ui_language === "es" || settings.ui_language === "en") return settings.ui_language;
+  const system = app.getPreferredSystemLanguages()[0] || app.getLocale() || "";
+  return system.toLowerCase().startsWith("es") ? "es" : "en";
+}
+
+function tr() {
+  return MAIN_COPY[resolveUiLanguage()];
+}
 
 let mainWindow = null;
 let overlayWindow = null;
@@ -204,6 +281,7 @@ function getFrontendState() {
     microphones: [],
     account: accountCache,
     ...settings,
+    ui_language_resolved: resolveUiLanguage(),
   };
 }
 
@@ -793,7 +871,7 @@ async function getBackendAuthContext() {
   const { apiBaseUrl } = requireAuthConfig();
   const session = await getValidSession();
   if (!session?.access_token) {
-    throw new Error("Sign in to Mushu to use the trial.");
+    throw new Error(tr().signInForTrial);
   }
   return {
     apiBaseUrl,
@@ -843,7 +921,7 @@ async function callMushuJson(pathname, body) {
 
   if (response.status === 401) {
     const refreshed = await refreshSupabaseSession();
-    if (!refreshed?.access_token) throw new Error("Your Mushu session expired. Please sign in again.");
+    if (!refreshed?.access_token) throw new Error(tr().sessionExpired);
     accessToken = refreshed.access_token;
     response = await fetchWithBackendAuth(`${apiBaseUrl}${pathname}`, accessToken, {
       method: "POST",
@@ -1014,13 +1092,14 @@ function setupTray() {
   };
   const updateMenu = () => {
     const activeAgent = getActiveVoiceAgent();
+    const t = tr();
     const menu = Menu.buildFromTemplate([
-      { label: activeAgent ? `Agent: ${activeAgent.name}` : "Mode: General", enabled: false },
+      { label: activeAgent ? t.trayAgent(activeAgent.name) : t.trayGeneral, enabled: false },
       { type: "separator" },
-      { label: "Show Mushu", click: showMainWindow },
-      { label: "Toggle Hands-off Dictation", click: () => toggleRecording() },
-      { label: "Cycle Voice Agent", click: () => cycleActiveVoiceAgent() },
-      { label: "Quit", click: () => {
+      { label: t.trayShow, click: showMainWindow },
+      { label: t.trayHandsOff, click: () => toggleRecording() },
+      { label: t.trayCycle, click: () => cycleActiveVoiceAgent() },
+      { label: t.trayQuit, click: () => {
         isQuitting = true;
         app.quit();
       } },
@@ -1113,13 +1192,13 @@ async function handleAudioInputsChanged({ added = [], removed = [], present = nu
       settings.selected_microphone_label = String(pick.label || "").trim() || null;
       await persistState();
       broadcast("frontend_state_changed", {});
-      notice = `Mic: ${settings.selected_microphone_label || "new microphone"}`;
+      notice = tr().micNew(settings.selected_microphone_label);
       console.info(`[mic] auto-selected newly connected input: ${settings.selected_microphone_label}`);
     }
   } else if (selected && removed.includes(selected)) {
     console.info("[mic] selected microphone disconnected — back to system default");
     await resetToDefault();
-    notice = defaultLabel ? `Mic: System default · ${defaultLabel}` : "Mic: System default";
+    notice = tr().micDefault(defaultLabel);
   }
 
   // Never cover the wave of a dictation in progress; the change applies to the next one.
@@ -1170,11 +1249,11 @@ function parseGroqErrorBody(body) {
 
 function makeAudioBlob(audioChunks, mimeType) {
   if (audioChunks.length === 0) {
-    throw new Error("No audio captured from the microphone. Check microphone permissions in Windows.");
+    throw new Error(tr().noAudio);
   }
   const audioBlob = new Blob(audioChunks, { type: mimeType || "audio/webm" });
   if (audioBlob.size < 128) {
-    throw new Error("The captured audio is empty or too short.");
+    throw new Error(tr().audioTooShort);
   }
   return audioBlob;
 }
@@ -1404,7 +1483,7 @@ function startDeepgramDirectStream(apiKey) {
               "[stt:direct→proxy] fallback fallido:",
               err instanceof Error ? err.message : String(err),
             );
-            broadcast("transcription_error", "Transcription failed. Check your connection.");
+            broadcast("transcription_error", tr().transcriptionFailed);
           }
         })();
       }
@@ -1508,7 +1587,7 @@ function startDeepgramProxyStream(apiBaseUrl, accessToken) {
       }
       if (data.type === "error") {
         if (isCurrent) deepgramSocketFailed = true;
-        broadcast("transcription_error", String(data.message || "Deepgram stream error."));
+        broadcast("transcription_error", String(data.message || tr().deepgramStreamError));
       }
     } catch (error) {
       console.warn("[stt:proxy] bad message:", error instanceof Error ? error.message : String(error));
@@ -1660,7 +1739,7 @@ async function transcribeAudio(audioChunks, mimeType) {
 
   if (response.status === 401) {
     const refreshed = await refreshSupabaseSession();
-    if (!refreshed?.access_token) throw new Error("Your Mushu session expired. Please sign in again.");
+    if (!refreshed?.access_token) throw new Error(tr().sessionExpired);
     response = await fetchWithBackendAuth(`${apiBaseUrl}/api/transcribe`, refreshed.access_token, {
       method: "POST",
       headers: {
@@ -1735,7 +1814,7 @@ async function processRecording() {
       (await transcribeAudio(audioChunks, mimeType).catch((error) => {
         const providerLabel =
           settings.transcription_provider === "deepgram" ? "Deepgram" : "Groq";
-        throw new Error(groqErrorMessage(`${providerLabel} transcription`, error));
+        throw new Error(groqErrorMessage(tr().transcription(providerLabel), error));
       }));
     if (!rawText) {
       sendDone({ text: "", active_voice_agent: getActiveVoiceAgent() });
@@ -1762,7 +1841,7 @@ async function processRecording() {
           mode: "agent",
         });
         output = String(data?.output || "").trim();
-        if (!output) throw new Error("Respuesta vacia del agente.");
+        if (!output) throw new Error(tr().emptyAgentReply);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error("[agent] failed:", message);
@@ -1812,7 +1891,7 @@ async function processRecording() {
           mode: "agent",
         });
         output = String(data?.output || "").trim();
-        if (!output) throw new Error("Respuesta vacia del agente.");
+        if (!output) throw new Error(tr().emptyAgentReply);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error("[voice-agent] failed:", message);
@@ -1904,7 +1983,7 @@ function startRecording({ handsOffMode = false } = {}) {
   if (recording) return;
   if (!canDictate()) {
     // Refuse up front instead of recording audio that can only fail at the end.
-    showOverlayBanner("Sign in to dictate", 2400);
+    showOverlayBanner(tr().signInToDictate, 2400);
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
@@ -2233,7 +2312,7 @@ function registerIpc(updateTrayMenu) {
         broadcast("frontend_state_changed", {});
         return getFrontendState();
       case "test_groq":
-        return accountCache ? "Groq ready via the Mushu backend." : "Sign in to use Groq via the backend.";
+        return accountCache ? tr().groqReady : tr().groqSignIn;
       case "save_deepgram_api_key": {
         const key = normalizeDeepgramApiKey(args.key);
         if (key) {
@@ -2247,11 +2326,9 @@ function registerIpc(updateTrayMenu) {
       }
       case "test_deepgram":
         if (getDeepgramApiKey()) {
-          return "DeepGram directo listo (nova-3, multi-idioma, smart_format, numerals, punctuate).";
+          return tr().deepgramDirect;
         }
-        return accountCache
-          ? "DeepGram via the Mushu backend. Add your API key for a direct connection."
-          : "Sign in or configure your DeepGram API key.";
+        return accountCache ? tr().deepgramBackend : tr().deepgramSignIn;
       case "get_history":
         return historyStore;
       case "clear_history":
@@ -2272,8 +2349,8 @@ function registerIpc(updateTrayMenu) {
         const input = args.input || {};
         const name = String(input.name || "").trim();
         const instruction = String(input.instruction || "").trim();
-        if (!name) throw new Error("El agente necesita un nombre.");
-        if (!instruction) throw new Error("El agente necesita una instrucción.");
+        if (!name) throw new Error(tr().agentNeedsName);
+        if (!instruction) throw new Error(tr().agentNeedsInstruction);
         const now = new Date().toISOString();
         const id = String(input.id || "").trim();
         const idx = id ? settings.voice_agents.findIndex((a) => a.id === id) : -1;
@@ -2306,6 +2383,14 @@ function registerIpc(updateTrayMenu) {
           defaultLabel: args.defaultLabel ? String(args.defaultLabel) : null,
         });
         return;
+      case "set_ui_language": {
+        const lang = String(args.language || "");
+        settings.ui_language = lang === "es" || lang === "en" ? lang : "auto";
+        await persistState();
+        updateTrayMenu?.();
+        broadcast("frontend_state_changed", {});
+        return getFrontendState();
+      }
       case "set_active_voice_agent": {
         const id = args.id == null ? null : String(args.id);
         settings.active_voice_agent_id = id && settings.voice_agents.some((a) => a.id === id) ? id : null;
@@ -2316,7 +2401,7 @@ function registerIpc(updateTrayMenu) {
       }
       case "improve_voice_agent_instruction": {
         const draft = String(args.text || "").trim();
-        if (!draft) throw new Error("Escribe una instrucción primero.");
+        if (!draft) throw new Error(tr().writeInstructionFirst);
         const agentName = String(args.name || "").trim();
         const metaInstruction = `You are helping a user write the instruction (system prompt) for a personal "voice agent". This agent rewrites a raw dictated idea into ready-to-paste text in a specific voice, tone, and format (e.g. a social media post for a given platform). The agent is named "${agentName || "Untitled"}". Improve and sharpen the following draft instruction: make it clear, specific, and actionable for an LLM, while preserving the user's intent (tone, platform, language, length, constraints). Return ONLY the improved instruction text, no preamble, no quotes, no markdown formatting.`;
         const data = await callMushuJson("/api/agent", {
@@ -2325,7 +2410,7 @@ function registerIpc(updateTrayMenu) {
           mode: "agent",
         });
         const improved = String(data?.output || "").trim();
-        if (!improved) throw new Error("No se pudo mejorar la instrucción.");
+        if (!improved) throw new Error(tr().couldNotImprove);
         return improved;
       }
       case "window_minimize":

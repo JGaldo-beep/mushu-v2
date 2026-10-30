@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { useCopy } from "@/i18n";
+import { overlayCopy } from "@/i18n/overlay";
 import { listen } from "@/lib/events";
 
 // The microphone pipeline (getUserMedia + AudioContext + worklet) costs over a second
@@ -49,6 +51,10 @@ export function useCaptureBridge() {
   const capturingRef = useRef(false);
   const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSamplesRef = useRef<number[]>([]);
+  // The capture effect runs once; the ref keeps its user-facing error in the current language.
+  const t = useCopy(overlayCopy);
+  const copyRef = useRef(t);
+  copyRef.current = t;
 
   useEffect(() => {
     const TARGET_SAMPLE_RATE = 16000;
@@ -224,7 +230,7 @@ export function useCaptureBridge() {
 
       const audioContext = audioContextRef.current;
       const stream = streamRef.current;
-      if (!audioContext || !stream) throw new Error("Microphone pipeline unavailable.");
+      if (!audioContext || !stream) throw new Error(copyRef.current.micPipelineUnavailable);
       if (audioContext.state === "suspended") await audioContext.resume();
 
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")

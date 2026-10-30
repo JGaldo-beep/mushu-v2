@@ -4,6 +4,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { useSettings } from "@/hooks/useSettings";
 import { useTheme } from "@/hooks/useTheme";
+import { useCopy } from "@/i18n";
+import { accountCopy } from "@/i18n/account";
+import { shellCopy } from "@/i18n/shell";
 import { tauri } from "@/lib/tauri";
 import type { NavSection } from "@/lib/types";
 
@@ -14,22 +17,24 @@ interface NavUserProps {
 export function NavUser({ onNavigate }: NavUserProps) {
   const { state, refresh } = useSettings();
   const { resolved, toggle } = useTheme();
+  const t = useCopy(shellCopy);
+  const { planName } = useCopy(accountCopy);
   const account = state?.account ?? null;
-  const displayName = account?.user.full_name || account?.user.email || "Mushu User";
+  const displayName = account?.user.full_name || account?.user.email || t.fallbackName;
   const planLabel = account?.entitlement?.status
-    ? `Plan ${account.entitlement.status}`
+    ? planName(account.entitlement.status)
     : account
-      ? "Account connected"
-      : "Free plan";
+      ? t.accountConnected
+      : t.freePlan;
   const initials = initialsFromAccount(account?.user.full_name || account?.user.email);
-  const nextThemeLabel = resolved === "dark" ? "Light mode" : "Dark mode";
+  const nextThemeLabel = resolved === "dark" ? t.lightMode : t.darkMode;
   const ThemeIcon = resolved === "dark" ? Sun : Moon;
 
   const logout = async () => {
     try {
       await tauri.logout();
       await refresh();
-      toast.success("Signed out");
+      toast.success(t.signedOut);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     }
@@ -41,7 +46,7 @@ export function NavUser({ onNavigate }: NavUserProps) {
         <SidebarMenuButton
           size="lg"
           className="data-[state=open]:bg-accent"
-          tooltip="Account"
+          tooltip={t.account}
           style={{ color: "var(--muted-foreground)" }}
         >
           <span
@@ -160,12 +165,12 @@ export function NavUser({ onNavigate }: NavUserProps) {
 
         <Divider />
 
-        <MenuItem icon={Sparkles} label="Profile" onClick={() => onNavigate("account")} />
-        <MenuItem icon={CreditCard} label="Plans" onClick={() => onNavigate("account")} />
+        <MenuItem icon={Sparkles} label={t.profile} onClick={() => onNavigate("account")} />
+        <MenuItem icon={CreditCard} label={t.plans} onClick={() => onNavigate("account")} />
 
         <Divider />
 
-        <MenuItem icon={LogOut} label="Sign out" onClick={() => void logout()} />
+        <MenuItem icon={LogOut} label={t.signOut} onClick={() => void logout()} />
       </PopoverContent>
     </Popover>
   );

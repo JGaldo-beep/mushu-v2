@@ -17,6 +17,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useHistoryContext } from "@/context/HistoryContext";
 import { HISTORY_BADGE_COLOR, historyBadgeTint, historyIcon, historyLabel } from "@/lib/historyDisplay";
+import { useCopy, useLanguage } from "@/i18n";
+import { historyCopy, type HistoryCopy } from "@/i18n/history";
 import type { HistoryItem } from "@/lib/types";
 
 interface HistoryPageProps {
@@ -24,9 +26,9 @@ interface HistoryPageProps {
   embedded?: boolean;
 }
 
-function formatTimestamp(iso: string) {
+function formatTimestamp(iso: string, language: string) {
   const d = new Date(iso);
-  return d.toLocaleString("en-US", {
+  return d.toLocaleString(language, {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -39,7 +41,7 @@ function formatDuration(ms: number) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function groupByDate(items: HistoryItem[]) {
+function groupByDate(items: HistoryItem[], t: HistoryCopy, language: string) {
   const groups: { label: string; items: HistoryItem[] }[] = [];
   const map = new Map<string, HistoryItem[]>();
   for (const item of items) {
@@ -49,11 +51,11 @@ function groupByDate(items: HistoryItem[]) {
     yesterday.setDate(today.getDate() - 1);
     let key: string;
     if (d.toDateString() === today.toDateString()) {
-      key = `Today — ${d.toLocaleDateString("en-US", { day: "2-digit", month: "long" })}`;
+      key = t.today(d.toLocaleDateString(language, { day: "2-digit", month: "long" }));
     } else if (d.toDateString() === yesterday.toDateString()) {
-      key = `Yesterday — ${d.toLocaleDateString("en-US", { day: "2-digit", month: "long" })}`;
+      key = t.yesterday(d.toLocaleDateString(language, { day: "2-digit", month: "long" }));
     } else {
-      key = d.toLocaleDateString("en-US", { weekday: "long", day: "2-digit", month: "long" });
+      key = d.toLocaleDateString(language, { weekday: "long", day: "2-digit", month: "long" });
     }
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(item);
@@ -66,6 +68,8 @@ function groupByDate(items: HistoryItem[]) {
 
 export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
   const { items, loading, clear } = useHistoryContext();
+  const t = useCopy(historyCopy);
+  const language = useLanguage();
   const [query, setQuery] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -76,11 +80,11 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
       (i) =>
         i.processed_text.toLowerCase().includes(q) ||
         i.raw_text.toLowerCase().includes(q) ||
-        historyLabel(i.mode_used).toLowerCase().includes(q),
+        historyLabel(i.mode_used, t).toLowerCase().includes(q),
     );
-  }, [items, query]);
+  }, [items, query, t]);
 
-  const groups = useMemo(() => groupByDate(filtered), [filtered]);
+  const groups = useMemo(() => groupByDate(filtered, t, language), [filtered, t, language]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -113,7 +117,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
                 letterSpacing: "-0.01em",
               }}
             >
-              History
+              {t.title}
             </p>
             <p
               style={{
@@ -123,7 +127,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
                 color: "var(--text-muted)",
               }}
             >
-              Your latest transcriptions
+              {t.subtitle}
             </p>
           </div>
         </div>
@@ -145,7 +149,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search…"
+              placeholder={t.search}
               className="glass-input rounded-lg"
               style={{
                 paddingLeft: "32px",
@@ -167,7 +171,8 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
                 className="glass-btn rounded-lg p-2"
                 disabled={!items.length}
                 style={{ opacity: !items.length ? 0.4 : 1 }}
-                title="Clear all history"
+                title={t.clearAll}
+                aria-label={t.clearAll}
               >
                 <Trash2 style={{ width: "15px", height: "15px" }} strokeWidth={1.85} />
               </button>
@@ -182,15 +187,15 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
             >
               <DialogHeader>
                 <DialogTitle style={{ color: "var(--foreground)" }}>
-                  Clear history?
+                  {t.clearTitle}
                 </DialogTitle>
                 <DialogDescription style={{ color: "var(--muted-foreground)" }}>
-                  This removes all transcriptions. It can't be undone.
+                  {t.clearBody}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-                  Cancel
+                  {t.cancel}
                 </Button>
                 <Button
                   variant="destructive"
@@ -199,7 +204,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
                     setConfirmOpen(false);
                   }}
                 >
-                  Clear
+                  {t.clear}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -227,7 +232,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
                 color: "var(--text-muted)",
               }}
             >
-              No matches.
+              {t.noMatches}
             </p>
           )}
           {!loading && groups.length > 0 && (
@@ -268,9 +273,11 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
 }
 
 function HistoryRow({ item }: { item: HistoryItem }) {
+  const t = useCopy(historyCopy);
+  const language = useLanguage();
   const Icon = historyIcon(item.mode_used);
   const color = HISTORY_BADGE_COLOR;
-  const label = historyLabel(item.mode_used);
+  const label = historyLabel(item.mode_used, t);
   const words = item.processed_text.split(/\s+/).filter(Boolean).length;
 
   return (
@@ -292,7 +299,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
             {label}
           </span>
           <span style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "var(--text-muted)" }}>
-            {formatTimestamp(item.timestamp)}
+            {formatTimestamp(item.timestamp, language)}
           </span>
           <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>·</span>
           <span style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "var(--text-muted)" }}>
@@ -323,7 +330,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
 
       <div className="flex items-center justify-between">
         <span style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "var(--text-muted)" }}>
-          {words} words
+          {t.words(words)}
         </span>
       </div>
     </GlassCard>
@@ -331,6 +338,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
 }
 
 function EmptyState() {
+  const t = useCopy(historyCopy);
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
       <div
@@ -347,10 +355,10 @@ function EmptyState() {
       </div>
       <div>
         <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "14px", fontWeight: 600, color: "var(--text-secondary)" }}>
-          No transcriptions yet
+          {t.emptyTitle}
         </p>
         <p style={{ fontFamily: "'Geist Variable', sans-serif", fontSize: "12px", fontWeight: 450, color: "var(--text-muted)", marginTop: "4px" }}>
-          Press the shortcut and dictate. Your transcriptions will show up here.
+          {t.emptyBody}
         </p>
       </div>
     </div>

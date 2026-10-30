@@ -1,5 +1,7 @@
 import React from "react";
 import { Minus, Square, X } from "lucide-react";
+import { useCopy } from "@/i18n";
+import { shellCopy } from "@/i18n/shell";
 
 const BTN_BASE: React.CSSProperties = {
   display: "flex",
@@ -18,15 +20,19 @@ const BTN_BASE: React.CSSProperties = {
 function WinBtn({
   onClick,
   hoverBg,
+  label,
   children,
 }: {
   onClick: () => void;
   hoverBg: string;
+  label: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
+      aria-label={label}
+      title={label}
       style={BTN_BASE}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = hoverBg;
@@ -44,6 +50,7 @@ function WinBtn({
 }
 
 export function TitleBar() {
+  const t = useCopy(shellCopy);
   return (
     <div style={{ height: "32px", flexShrink: 0, display: "flex" }}>
       {/*
@@ -57,17 +64,23 @@ export function TitleBar() {
       />
 
       {/* Buttons are siblings of the drag region — pointer events work normally */}
-      <WinBtn hoverBg="var(--secondary)" onClick={() => void window.mushu.invoke("window_minimize")}>
+      <WinBtn
+        hoverBg="var(--secondary)"
+        label={t.minimize}
+        onClick={() => void window.mushu.invoke("window_minimize")}
+      >
         <Minus size={12} strokeWidth={2} />
       </WinBtn>
       <WinBtn
         hoverBg="var(--secondary)"
+        label={t.maximize}
         onClick={() => void window.mushu.invoke("window_toggle_maximize")}
       >
         <Square size={10} strokeWidth={2} />
       </WinBtn>
       <WinBtn
         hoverBg="color-mix(in oklab, var(--destructive) 85%, transparent)"
+        label={t.close}
         onClick={() => void window.mushu.invoke("window_close")}
       >
         <X size={13} strokeWidth={2} />

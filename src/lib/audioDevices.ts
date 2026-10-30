@@ -25,7 +25,10 @@ export interface MicrophoneList {
   missingLabels: boolean;
 }
 
-export async function listMicrophones(): Promise<MicrophoneList> {
+// `unnamed` names an input Windows reports without a label (no mic permission yet).
+export async function listMicrophones(
+  unnamed: (n: number) => string = (n) => `Microphone ${n}`,
+): Promise<MicrophoneList> {
   const all = await navigator.mediaDevices.enumerateDevices();
   const devices: AudioDevice[] = [];
   let defaultLabel: string | null = null;
@@ -40,7 +43,7 @@ export async function listMicrophones(): Promise<MicrophoneList> {
     if (isPseudoDevice(d.deviceId)) continue;
     devices.push({
       deviceId: d.deviceId,
-      label: d.label ? friendlyMicLabel(d.label) : `Microphone ${devices.length + 1}`,
+      label: d.label ? friendlyMicLabel(d.label) : unnamed(devices.length + 1),
     });
   }
   return { devices, defaultLabel, missingLabels };

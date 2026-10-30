@@ -17,10 +17,14 @@ import { Skeleton } from "@/components/Skeleton";
 import { useHistoryContext } from "@/context/HistoryContext";
 import { Ripple } from "@/components/ui/ripple";
 import { HistoryPage } from "@/pages/HistoryPage";
+import { useCopy, useLanguage } from "@/i18n";
+import { historyCopy } from "@/i18n/history";
+import { homeCopy } from "@/i18n/home";
 import { historyIcon, historyLabel } from "@/lib/historyDisplay";
 import type { NavSection } from "@/lib/types";
 
 function RowCopyButton({ text }: { text: string }) {
+  const t = useCopy(historyCopy);
   const [copied, setCopied] = useState(false);
   const onCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -36,7 +40,7 @@ function RowCopyButton({ text }: { text: string }) {
     <button
       type="button"
       onClick={onCopy}
-      aria-label={copied ? "Copied" : "Copy"}
+      aria-label={copied ? t.copied : t.copy}
       className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
       style={{
         width: "28px",
@@ -58,15 +62,15 @@ function RowCopyButton({ text }: { text: string }) {
   );
 }
 
-function relativeTime(iso: string) {
+function relativeTime(iso: string, t: typeof homeCopy.en, language: string) {
   const now = new Date();
   const then = new Date(iso);
   const diff = (now.getTime() - then.getTime()) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} h ago`;
-  if (diff < 86400 * 2) return "yesterday";
-  return then.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+  if (diff < 60) return t.justNow;
+  if (diff < 3600) return t.minutesAgo(Math.floor(diff / 60));
+  if (diff < 86400) return t.hoursAgo(Math.floor(diff / 3600));
+  if (diff < 86400 * 2) return t.yesterday;
+  return then.toLocaleDateString(language, { day: "numeric", month: "short" });
 }
 
 type HomePageProps = {
@@ -77,6 +81,9 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
   const { status, hotkey, modeHotkey, pauseHotkey, paused, resultText, errorMessage } =
     useDictation();
   const { activeAgent } = useVoiceAgents();
+  const t = useCopy(homeCopy);
+  const historyT = useCopy(historyCopy);
+  const language = useLanguage();
   const [historyOpen, setHistoryOpen] = useState(false);
   const { items, loading } = useHistoryContext();
   const { isSignedIn, loaded: accountLoaded } = useAccountStatus();
@@ -112,7 +119,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 margin: 0,
               }}
             >
-              Home
+              {t.title}
             </h1>
             <p
               style={{
@@ -123,7 +130,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 marginTop: "2px",
               }}
             >
-              Ready to dictate
+              {t.subtitle}
             </p>
           </div>
         </div>
@@ -194,7 +201,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   lineHeight: 1.3,
                 }}
               >
-                You're not signed in to Mushu
+                {t.signedOutTitle}
               </p>
               <p
                 style={{
@@ -206,7 +213,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   marginTop: "2px",
                 }}
               >
-                Sign in to use dictation, the agent, and trial minutes.
+                {t.signedOutBody}
               </p>
             </div>
             <button
@@ -228,7 +235,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
               onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.88")}
               onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
             >
-              Sign in
+              {t.signIn}
             </button>
           </div>
         </div>
@@ -245,25 +252,25 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
           ) : (
             <>
               <MetricCard
-                label="Words today"
+                label={t.wordsToday}
                 value={metrics.wordsToday}
                 delta={metrics.wordsTodayDelta ?? undefined}
               />
               <MetricCard
-                label="Words / wk."
+                label={t.wordsWeek}
                 value={metrics.wordsWeek}
                 delta={metrics.wordsWeekDelta ?? undefined}
               />
               <MetricCard
-                label="Min / wk."
+                label={t.minutesWeek}
                 value={metrics.minutesWeek}
-                unit="min"
+                unit={t.minUnit}
                 delta={metrics.minutesWeekDelta ?? undefined}
               />
               <MetricCard
-                label="Avg. speed"
+                label={t.avgSpeed}
                 value={metrics.velocityToday}
-                unit={metrics.velocityToday !== "--" ? "wpm" : ""}
+                unit={metrics.velocityToday !== "--" ? t.wpmUnit : ""}
                 delta={metrics.velocityTodayDelta ?? undefined}
               />
             </>
@@ -301,7 +308,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     fontWeight: 700,
                   }}
                 >
-                  Push-to-talk
+                  {t.pushToTalk}
                 </span>
 
                 <div className="flex items-center gap-2">
@@ -355,7 +362,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     lineHeight: 1.55,
                   }}
                 >
-                  Hold the shortcut and talk in any app — release to transcribe.
+                  {t.holdHint}
                 </p>
 
                 <div
@@ -378,7 +385,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                       fontWeight: 700,
                     }}
                   >
-                    Switch voice agent
+                    {t.switchAgent}
                   </span>
                   <ShortcutKbd keys={modeHotkeyParts} size="sm" />
                 </div>
@@ -438,7 +445,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                         color: "var(--foreground)",
                       }}
                     >
-                      {paused ? "Paused" : "Listening…"}
+                      {paused ? t.paused : t.listening}
                     </span>
                   </div>
                   <ShortcutKbd keys={paused ? pauseHotkeyParts : hotkeyParts} />
@@ -449,7 +456,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                       color: "var(--muted-foreground)",
                     }}
                   >
-                    {paused ? "Press to resume — nothing is recorded meanwhile" : "Release to transcribe"}
+                    {paused ? t.pausedHint : t.releaseHint}
                   </p>
                 </div>
               </motion.div>
@@ -486,7 +493,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     color: "var(--muted-foreground)",
                   }}
                 >
-                  Transcribing…
+                  {t.transcribing}
                 </p>
               </motion.div>
             )}
@@ -518,7 +525,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                         color: "var(--muted-foreground)",
                       }}
                     >
-                      {activeAgent ? activeAgent.name : "General"}
+                      {activeAgent ? activeAgent.name : t.general}
                     </span>
                     <CopyButton text={resultText} variant="ghost" />
                   </div>
@@ -589,7 +596,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 color: "var(--muted-foreground)",
               }}
             >
-              Recent history
+              {t.recentHistory}
             </span>
             <button
               type="button"
@@ -608,7 +615,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
               onMouseEnter={(e) => (e.currentTarget.style.color = "var(--foreground)")}
               onMouseLeave={(e) => (e.currentTarget.style.color = "var(--muted-foreground)")}
             >
-              See all
+              {t.seeAll}
               <ChevronRight size={12} strokeWidth={2.25} />
             </button>
           </div>
@@ -637,7 +644,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                   color: "var(--muted-foreground)",
                 }}
               >
-                No sessions yet. Hold the shortcut and start talking.
+                {t.noSessions}
               </p>
             </div>
           ) : (
@@ -652,7 +659,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
             >
               {recentHistory.map((item, i) => {
                 const Icon = historyIcon(item.mode_used);
-                const label = historyLabel(item.mode_used);
+                const label = historyLabel(item.mode_used, historyT);
                 const text = item.processed_text || item.raw_text;
                 return (
                   <div
@@ -696,7 +703,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                             color: "var(--muted-foreground)",
                           }}
                         >
-                          · {relativeTime(item.timestamp)}
+                          · {relativeTime(item.timestamp, t, language)}
                         </span>
                       </div>
                       <p
@@ -735,7 +742,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
           }}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Full history</SheetTitle>
+            <SheetTitle>{t.fullHistory}</SheetTitle>
           </SheetHeader>
           <HistoryPage embedded />
         </SheetContent>

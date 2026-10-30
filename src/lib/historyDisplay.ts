@@ -1,4 +1,5 @@
 import { Bot, Mic, type LucideIcon } from "lucide-react";
+import type { HistoryCopy } from "@/i18n/history";
 
 // History entries tag their source via HistoryItem.mode_used: "DEFAULT" for
 // plain dictation, "AGENT" for the selection agent, or "Agent: <name>" for a
@@ -13,8 +14,9 @@ export function historyIcon(modeUsed: string): LucideIcon {
   return modeUsed.startsWith("Agent:") || modeUsed === "AGENT" ? Bot : Mic;
 }
 
-export function historyLabel(modeUsed: string): string {
-  if (modeUsed === "DEFAULT") return "General";
-  if (modeUsed === "AGENT") return "Agent";
+export function historyLabel(modeUsed: string, t: HistoryCopy): string {
+  if (modeUsed === "DEFAULT") return t.general;
+  if (modeUsed === "AGENT") return t.agent;
+  if (modeUsed.startsWith("Agent:")) return t.agentNamed(modeUsed.slice("Agent:".length).trim());
   return modeUsed;
 }

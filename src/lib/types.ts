@@ -1,5 +1,9 @@
 export type ThemePref = "system" | "light" | "dark";
 
+// The app's own language. "auto" follows Windows; the main process resolves it.
+export type UiLanguage = "es" | "en";
+export type UiLanguagePref = "auto" | UiLanguage;
+
 export type ProcessingMode = "cloud_first" | "local_only";
 
 export type TranscriptionProvider = "groq" | "deepgram";
@@ -45,6 +49,8 @@ export type FrontendState = {
   account: MushuAccount | null;
   voice_agents: VoiceAgent[];
   active_voice_agent_id: string | null;
+  ui_language: UiLanguagePref;
+  ui_language_resolved: UiLanguage;
 };
 
 export type MushuEntitlement = {

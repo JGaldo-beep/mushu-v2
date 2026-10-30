@@ -76,6 +76,13 @@ The WebSocket stream URL is a separate service. By default `resolveMushuStreamUr
 ### .env loading
 `loadDotEnvFile()` reads a `.env` file adjacent to `main.js` at startup and fills any `VITE_*` keys not already in `process.env`. The settings UI fields `supabase_url`, `supabase_anon_key`, and `api_base_url` fall back to `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_API_BASE_URL` respectively when empty. The `.env` file is packaged into the installer via `build.files` in `package.json` — treat it as the source of defaults for distributed builds, not a secret store.
 
+### UI language (English / Spanish)
+The app's own text is bilingual. `settings.ui_language` is `"auto"` (default, follows Windows' preferred languages: any `es-*` → Spanish, else English), `"es"` or `"en"`; it is set through the dedicated `set_ui_language` IPC (not `save_settings`), and `getFrontendState()` adds the resolved `ui_language_resolved`. It is unrelated to `spoken_language`, the language the user dictates in.
+
+- **Renderer text** lives in `src/i18n/<area>.ts`, one file per area, shaped `const en = {...}; const es: typeof en = {...}; export const xCopy = { en, es };` so a missing Spanish string is a type error. Components read it with `const t = useCopy(xCopy)`; `useLanguage()` gives the code for `Intl` dates and numbers. All three windows are wrapped in `LanguageProvider` (`src/i18n/index.tsx`), which follows `frontend_state_changed`, so a switch applies live.
+- **Main-process text** (tray menu, overlay banners, errors that reach the UI) lives in `MAIN_COPY` in `main.js`; use `tr().key`, and call `updateTrayMenu?.()` when the language changes.
+- New UI text goes into both languages, never inline. Spanish uses tú and the glossary already in the copy files (dictar, agente de voz, atajo, manos libres, Ajustes…). User content (agent names and instructions, transcripts) and key names in hotkeys are never translated.
+
 ### Visual identity
 The canonical palette and brand assets live in the sibling `mushu-landing` repo. Tokens defined in `src/index.css` (`:root` light + `.dark` block) and mirrored in `src/overlay/overlay.css`. Logo ("Onda en vidrio": five voice bars that draw an M, on a dark glass tile): `public/mini-logo.svg` (full glass app icon, favicon), `public/icon-small.svg` (flat variant for ≤32px and the tray), `public/logo.svg` (bare mark, no tile). `src/components/LogoIcon.tsx` inlines the flat variant. `scripts/generate-icon.cjs` regenerates `build/icon.ico` (small sizes from `icon-small.svg`, the rest from `mini-logo.svg`) and the PNG icon set; `mushu-icon.png` (tray/window) comes from the small variant.
 

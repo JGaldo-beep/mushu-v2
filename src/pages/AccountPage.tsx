@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { GlassCard } from "@/components/GlassCard";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useSettings } from "@/hooks/useSettings";
+import { useCopy } from "@/i18n";
+import { accountCopy } from "@/i18n/account";
 import { tauri } from "@/lib/tauri";
 import type { MushuAccount, MushuEntitlement } from "@/lib/types";
 
@@ -51,6 +53,7 @@ const WAITING_TIMEOUT_MS = 5 * 60 * 1000;
 
 export function AccountPage() {
   const { state, loading, refresh } = useSettings();
+  const t = useCopy(accountCopy);
   const [busy, setBusy] = useState(false);
   const [waitingForLogin, setWaitingForLogin] = useState(false);
   const account = state?.account ?? null;
@@ -59,16 +62,16 @@ export function AccountPage() {
   useEffect(() => {
     if (account && waitingForLogin) {
       setWaitingForLogin(false);
-      const label = account.user.full_name || account.user.email || "your account";
-      toast.success(`Signed in as ${label}`);
+      const label = account.user.full_name || account.user.email || t.yourAccount;
+      toast.success(t.signedInAs(label));
     }
-  }, [account, waitingForLogin]);
+  }, [account, waitingForLogin, t]);
 
   // Bail out after a long stall — the browser might be closed or the user wandered off.
   useEffect(() => {
     if (!waitingForLogin) return;
-    const t = window.setTimeout(() => setWaitingForLogin(false), WAITING_TIMEOUT_MS);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => setWaitingForLogin(false), WAITING_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
   }, [waitingForLogin]);
   const minutes = remainingMinutes(account?.entitlement ?? null);
   const minuteBarMax = Math.max(minutes ?? 0, account?.entitlement?.status === "trial" ? 120 : 60);
@@ -81,7 +84,7 @@ export function AccountPage() {
     try {
       await tauri.logout();
       await refresh();
-      toast.success("Signed out");
+      toast.success(t.signedOut);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -94,7 +97,7 @@ export function AccountPage() {
     try {
       await tauri.refreshAccount();
       await refresh();
-      toast.success("Account refreshed");
+      toast.success(t.refreshed);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -158,7 +161,7 @@ export function AccountPage() {
                 margin: 0,
               }}
             >
-              Account
+              {t.title}
             </h1>
             <p
               style={{
@@ -169,7 +172,7 @@ export function AccountPage() {
                 marginTop: "2px",
               }}
             >
-              Managed on the web — synced to your desktop
+              {t.subtitle}
             </p>
           </div>
         </div>
@@ -196,7 +199,7 @@ export function AccountPage() {
                 {account?.user.avatar_url ? (
                   <img
                     src={account.user.avatar_url}
-                    alt={account.user.full_name || account.user.email || "Avatar"}
+                    alt={account.user.full_name || account.user.email || t.avatar}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 ) : account ? (
@@ -224,7 +227,7 @@ export function AccountPage() {
                     letterSpacing: "-0.01em",
                   }}
                 >
-                  {account?.user.full_name || account?.user.email || "Not signed in"}
+                  {account?.user.full_name || account?.user.email || t.notSignedIn}
                 </h3>
                 {account?.user.full_name && account.user.email ? (
                   <p
@@ -250,9 +253,9 @@ export function AccountPage() {
                 >
                   {account
                     ? account.entitlement
-                      ? `Plan ${account.entitlement.status || "trial"} · ${minutes} min available`
-                      : "Account connected · sync pending"
-                    : "Connect your account to activate the trial"}
+                      ? t.planSummary(t.planName(account.entitlement.status || "trial"), minutes)
+                      : t.syncPending
+                    : t.connectForTrial}
                 </p>
                 {account ? (
                   <div className="mt-3">
@@ -272,7 +275,7 @@ export function AccountPage() {
                       style={{ color: "var(--muted-foreground)" }}
                     >
                       <span>
-                        {minutes === null ? "Syncing minutes" : `${minutes} minutes remaining`}
+                        {minutes === null ? t.syncingMinutes : t.minutesRemaining(minutes)}
                       </span>
                       <span>{minutePercent}%</span>
                     </div>
@@ -315,7 +318,7 @@ export function AccountPage() {
                       lineHeight: 1.2,
                     }}
                   >
-                    Waiting for sign-in…
+                    {t.waitingTitle}
                   </h3>
                   <p
                     style={{
@@ -328,8 +331,7 @@ export function AccountPage() {
                       maxWidth: "380px",
                     }}
                   >
-                    Finish signing in in your browser. We'll detect it automatically and
-                    sync your session — no need to come back here.
+                    {t.waitingBody}
                   </p>
                 </div>
 
@@ -345,7 +347,7 @@ export function AccountPage() {
                     }}
                   >
                     <ExternalLink size={12} strokeWidth={2.2} />
-                    Reopen browser
+                    {t.reopenBrowser}
                   </button>
                   <button
                     type="button"
@@ -368,7 +370,7 @@ export function AccountPage() {
                     }}
                   >
                     <X size={12} strokeWidth={2.2} />
-                    Cancel
+                    {t.cancel}
                   </button>
                 </div>
               </div>
@@ -401,7 +403,7 @@ export function AccountPage() {
                       lineHeight: 1.2,
                     }}
                   >
-                    Sign in on the web
+                    {t.signInTitle}
                   </h3>
                   <p
                     style={{
@@ -414,9 +416,7 @@ export function AccountPage() {
                       maxWidth: "420px",
                     }}
                   >
-                    Account, billing and plans live on mushu.space. Sign in there and your
-                    browser hands the session back to this desktop app automatically — no
-                    second password to manage.
+                    {t.signInBody}
                   </p>
                 </div>
               </div>
@@ -449,7 +449,7 @@ export function AccountPage() {
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
               >
                 <ExternalLink size={15} strokeWidth={2.2} />
-                Sign in via the web
+                {t.signInButton}
               </button>
 
               <p
@@ -463,7 +463,7 @@ export function AccountPage() {
                   marginTop: "14px",
                 }}
               >
-                Don't have an account?{" "}
+                {t.noAccount}{" "}
                 <button
                   type="button"
                   onClick={() => void openWebSignup()}
@@ -480,7 +480,7 @@ export function AccountPage() {
                     textDecoration: "underline",
                   }}
                 >
-                  Create one on the web
+                  {t.createAccount}
                 </button>
               </p>
             </GlassCard>
@@ -512,7 +512,7 @@ export function AccountPage() {
                     color: "var(--foreground)",
                   }}
                 >
-                  Trial active
+                  {t.planCardTitle(account?.entitlement?.status ?? null)}
                 </h3>
                 <p
                   style={{
@@ -525,8 +525,8 @@ export function AccountPage() {
                   }}
                 >
                   {minutes === null
-                    ? "Refresh to see your available minutes."
-                    : `You have ${minutes} minutes available. Each dictation deducts seconds from your plan.`}
+                    ? t.minutesUnknown
+                    : t.minutesAvailable(minutes)}
                 </p>
               </div>
             </div>
@@ -545,7 +545,7 @@ export function AccountPage() {
             >
               <span className="inline-flex items-center justify-center gap-2">
                 <RefreshCw size={14} strokeWidth={2} />
-                Refresh minutes
+                {t.refreshMinutes}
               </span>
             </button>
           </GlassCard>
@@ -563,7 +563,7 @@ export function AccountPage() {
                       color: "var(--foreground)",
                     }}
                   >
-                    Billing & plans
+                    {t.billingTitle}
                   </h3>
                   <p
                     style={{
@@ -573,7 +573,7 @@ export function AccountPage() {
                       color: "var(--muted-foreground)",
                     }}
                   >
-                    Managed on the web. The desktop just consumes your active plan.
+                    {t.billingBody}
                   </p>
                 </div>
               </div>
@@ -588,7 +588,7 @@ export function AccountPage() {
                   flexShrink: 0,
                 }}
               >
-                Open on web
+                {t.openOnWeb}
                 <ExternalLink size={11} strokeWidth={2.2} />
               </button>
             </div>
@@ -613,7 +613,7 @@ export function AccountPage() {
                 }}
               >
                 <LogOut size={15} strokeWidth={2} />
-                Sign out
+                {t.signOut}
               </button>
             </GlassCard>
           ) : null}

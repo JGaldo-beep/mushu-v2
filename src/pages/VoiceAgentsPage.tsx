@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useVoiceAgents } from "@/hooks/useVoiceAgents";
+import { useCopy } from "@/i18n";
+import { voiceAgentsCopy } from "@/i18n/voiceAgents";
 import type { VoiceAgent } from "@/lib/types";
 
 const AGENT_COLOR = "var(--primary)";
@@ -33,6 +35,7 @@ function AgentDialog({
   agent: VoiceAgent | null;
   onSave: (input: { id?: string; name: string; instruction: string }) => Promise<unknown>;
 }) {
+  const t = useCopy(voiceAgentsCopy);
   const [name, setName] = useState(agent?.name ?? "");
   const [instruction, setInstruction] = useState(agent?.instruction ?? "");
   const [saving, setSaving] = useState(false);
@@ -69,25 +72,22 @@ function AgentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{agent ? "Edit voice agent" : "New voice agent"}</DialogTitle>
-          <DialogDescription>
-            Give it a name and an instruction — this is the "voice" applied to your dictation
-            whenever this agent is active.
-          </DialogDescription>
+          <DialogTitle>{agent ? t.dialogEditTitle : t.dialogNewTitle}</DialogTitle>
+          <DialogDescription>{t.dialogDescription}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Name</label>
+            <label className="text-xs font-medium text-muted-foreground">{t.name}</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Partner Post on X"
+              placeholder={t.namePlaceholder}
               maxLength={60}
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground">Instruction</label>
+              <label className="text-xs font-medium text-muted-foreground">{t.instruction}</label>
               <Button
                 type="button"
                 variant="ghost"
@@ -96,13 +96,13 @@ function AgentDialog({
                 disabled={improving || !instruction.trim()}
               >
                 <Sparkles size={12} strokeWidth={2.25} />
-                {improving ? "Improving..." : "Improve with AI"}
+                {improving ? t.improving : t.improve}
               </Button>
             </div>
             <Textarea
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
-              placeholder="Rewrite the dictated idea as an English X/Twitter post, concise and confident tone, no hashtags."
+              placeholder={t.instructionPlaceholder}
               rows={5}
             />
           </div>
@@ -114,10 +114,10 @@ function AgentDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t.cancel}
           </Button>
           <Button onClick={handleSave} disabled={saving || !name.trim() || !instruction.trim()}>
-            {saving ? "Saving..." : "Save"}
+            {saving ? t.saving : t.save}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -126,6 +126,7 @@ function AgentDialog({
 }
 
 export function VoiceAgentsPage() {
+  const t = useCopy(voiceAgentsCopy);
   const { agents, activeAgentId, saveAgent, deleteAgent, setActiveAgent } = useVoiceAgents();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<VoiceAgent | null>(null);
@@ -175,7 +176,7 @@ export function VoiceAgentsPage() {
                 letterSpacing: "-0.01em",
               }}
             >
-              Voice Agents
+              {t.title}
             </p>
             <p
               style={{
@@ -185,13 +186,13 @@ export function VoiceAgentsPage() {
                 color: "var(--text-muted)",
               }}
             >
-              Custom presets that rewrite your dictation in a specific voice
+              {t.subtitle}
             </p>
           </div>
         </div>
         <Button size="sm" onClick={openCreate}>
           <Plus size={14} strokeWidth={2.5} />
-          New Agent
+          {t.newAgent}
         </Button>
       </div>
 
@@ -200,14 +201,14 @@ export function VoiceAgentsPage() {
           <GlassCard className="flex flex-col items-center justify-center gap-2 p-10 text-center">
             <Bot size={28} strokeWidth={1.75} style={{ color: "var(--text-muted)" }} />
             <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-              No voice agents yet.
+              {t.emptyTitle}
             </p>
             <p style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-              Create one to turn a raw dictation into a ready-to-paste post, in whatever voice you configure.
+              {t.emptyBody}
             </p>
             <Button size="sm" onClick={openCreate} className="mt-2">
               <Plus size={14} strokeWidth={2.5} />
-              New Agent
+              {t.newAgent}
             </Button>
           </GlassCard>
         ) : (
@@ -266,13 +267,15 @@ export function VoiceAgentsPage() {
                             }}
                           >
                             <Check size={10} strokeWidth={3} />
-                            Active
+                            {t.active}
                           </span>
                         )}
                         <span
                           role="button"
                           tabIndex={0}
                           onClick={(e) => openEdit(agent, e)}
+                          aria-label={t.edit}
+                          title={t.edit}
                           className="opacity-0 transition-opacity group-hover:opacity-100"
                           style={{
                             width: "24px",
@@ -290,6 +293,8 @@ export function VoiceAgentsPage() {
                           role="button"
                           tabIndex={0}
                           onClick={(e) => handleDelete(agent.id, e)}
+                          aria-label={t.delete}
+                          title={t.delete}
                           className="opacity-0 transition-opacity group-hover:opacity-100"
                           style={{
                             width: "24px",
@@ -351,9 +356,7 @@ export function VoiceAgentsPage() {
             lineHeight: 1.5,
           }}
         >
-          Activating an agent replaces normal mode formatting: every dictation is rewritten with
-          that agent's instruction until you deactivate it (click the active card again) or pick
-          another one.
+          {t.footnote}
         </p>
       </div>
 

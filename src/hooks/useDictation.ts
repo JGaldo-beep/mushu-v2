@@ -1,5 +1,7 @@
 import { listen } from "@/lib/events";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useCopy } from "@/i18n";
+import { homeCopy } from "@/i18n/home";
 import { tauri } from "@/lib/tauri";
 
 export type DictationStatus = "idle" | "recording" | "processing" | "result" | "error";
@@ -20,6 +22,10 @@ const RESULT_AUTO_CLEAR_MS = 12000;
 const ERROR_AUTO_CLEAR_MS = 6000;
 
 export function useDictation() {
+  const t = useCopy(homeCopy);
+  // Read through a ref so a language change doesn't resubscribe every listener.
+  const copyRef = useRef(t);
+  copyRef.current = t;
   const [state, setState] = useState<DictationState>({
     status: "idle",
     resultText: null,
@@ -97,7 +103,7 @@ export function useDictation() {
     });
 
     const unlistenError = listen("transcription_error", (event) => {
-      const msg = String(event.payload ?? "Transcription error.");
+      const msg = String(event.payload ?? copyRef.current.transcriptionError);
       setState((s) => ({ ...s, status: "error", errorMessage: msg }));
       scheduleClear(ERROR_AUTO_CLEAR_MS);
     });
@@ -121,7 +127,7 @@ export function useDictation() {
     });
 
     const unlistenGroq = listen("groq_error", (event) => {
-      const msg = String(event.payload ?? "Failed to transcribe. Try again.");
+      const msg = String(event.payload ?? copyRef.current.transcribeFailed);
       setState((s) => ({ ...s, status: "error", errorMessage: msg }));
       scheduleClear(ERROR_AUTO_CLEAR_MS);
     });

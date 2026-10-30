@@ -13,13 +13,15 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useCopy } from "@/i18n";
+import { shellCopy } from "@/i18n/shell";
 import type { NavSection } from "@/lib/types";
 
-const NAV_ITEMS: { value: NavSection; icon: typeof Home; label: string }[] = [
-  { value: "home", icon: Home, label: "Home" },
-  { value: "voice-agents", icon: Bot, label: "Voice Agents" },
-  { value: "ai-features", icon: Wand2, label: "AI Features" },
-  { value: "settings", icon: Settings, label: "Settings" },
+const NAV_ITEMS: { value: NavSection; icon: typeof Home }[] = [
+  { value: "home", icon: Home },
+  { value: "voice-agents", icon: Bot },
+  { value: "ai-features", icon: Wand2 },
+  { value: "settings", icon: Settings },
 ];
 
 interface AppSidebarProps {
@@ -28,6 +30,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ section, onSectionChange }: AppSidebarProps) {
+  const t = useCopy(shellCopy);
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader style={{ padding: "14px 16px 10px" }}>
@@ -50,11 +53,12 @@ export function AppSidebar({ section, onSectionChange }: AppSidebarProps) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>{t.navigation}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map(({ value, icon: Icon, label }) => {
+              {NAV_ITEMS.map(({ value, icon: Icon }) => {
                 const isActive = section === value;
+                const label = t.nav[value];
                 return (
                   <SidebarMenuItem key={value}>
                     <SidebarMenuButton

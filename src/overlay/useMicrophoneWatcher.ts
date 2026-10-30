@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useCopy } from "@/i18n";
+import { overlayCopy } from "@/i18n/overlay";
 import { listMicrophones } from "@/lib/audioDevices";
 
 // Reports microphones plugged in or out to the main process, which decides whether to
@@ -6,6 +8,11 @@ import { listMicrophones } from "@/lib/audioDevices";
 // because that renderer is always alive and already holds the microphone permission,
 // so device labels are available even while the main window is closed.
 export function useMicrophoneWatcher() {
+  // Unlabelled inputs get a name main.js shows in the "Mic: …" banner.
+  const { microphoneN } = useCopy(overlayCopy);
+  const unnamedRef = useRef(microphoneN);
+  unnamedRef.current = microphoneN;
+
   useEffect(() => {
     let known: Set<string> | null = null;
     let disposed = false;
@@ -13,7 +20,7 @@ export function useMicrophoneWatcher() {
     const scan = async () => {
       let list;
       try {
-        list = await listMicrophones();
+        list = await listMicrophones((n) => unnamedRef.current(n));
       } catch {
         return;
       }

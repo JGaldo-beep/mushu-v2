@@ -1,11 +1,13 @@
 import { Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
+import { useCopy } from "@/i18n";
+import { shellCopy } from "@/i18n/shell";
 import type { ThemePref } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const OPTIONS: { value: ThemePref; icon: LucideIcon; label: string }[] = [
-  { value: "system", icon: Monitor, label: "Auto" },
-  { value: "light", icon: Sun, label: "Claro" },
-  { value: "dark", icon: Moon, label: "Oscuro" },
+const OPTIONS: { value: ThemePref; icon: LucideIcon }[] = [
+  { value: "system", icon: Monitor },
+  { value: "light", icon: Sun },
+  { value: "dark", icon: Moon },
 ];
 
 export function ThemeToggle({
@@ -15,20 +17,22 @@ export function ThemeToggle({
   value: ThemePref;
   onChange: (next: ThemePref) => void;
 }) {
+  const t = useCopy(shellCopy);
   return (
     <div
       role="group"
-      aria-label="Tema"
+      aria-label={t.theme}
       className="grid grid-cols-3 gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5"
     >
-      {OPTIONS.map(({ value: v, icon: Icon, label }) => {
+      {OPTIONS.map(({ value: v, icon: Icon }) => {
         const active = value === v;
+        const label = t.themes[v];
         return (
           <button
             key={v}
             type="button"
             aria-pressed={active}
-            aria-label={`Tema ${label.toLowerCase()}`}
+            aria-label={t.themeOption(label)}
             title={label}
             onClick={() => onChange(v)}
             className={cn(

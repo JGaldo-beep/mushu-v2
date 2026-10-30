@@ -1,4 +1,4 @@
-import type { FrontendState, HistoryItem, SaveSettingsInput } from "./types";
+import type { FrontendState, HistoryItem, SaveSettingsInput, UiLanguagePref } from "./types";
 
 export function patchSettings(patch: Partial<SaveSettingsInput>) {
   return window.mushu.invoke<FrontendState>("save_settings", { input: patch });
@@ -27,6 +27,8 @@ export const tauri = {
   deleteVoiceAgent: (id: string) => window.mushu.invoke<FrontendState>("delete_voice_agent", { id }),
   setActiveVoiceAgent: (id: string | null) =>
     window.mushu.invoke<FrontendState>("set_active_voice_agent", { id }),
+  setUiLanguage: (language: UiLanguagePref) =>
+    window.mushu.invoke<FrontendState>("set_ui_language", { language }),
   improveVoiceAgentInstruction: (text: string, name?: string) =>
     window.mushu.invoke<string>("improve_voice_agent_instruction", { text, name }),
 };

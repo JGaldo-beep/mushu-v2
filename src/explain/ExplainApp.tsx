@@ -1,7 +1,9 @@
 import { listen } from "@/lib/events";
 import { X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ThinkingDots } from "@/overlay/components/ThinkingDots";
+import { useCopy } from "@/i18n";
+import { explainCopy } from "@/i18n/explain";
 import { cn } from "@/lib/utils";
 
 async function closeExplain() {
@@ -13,6 +15,10 @@ async function closeExplain() {
 }
 
 export function ExplainApp() {
+  const t = useCopy(explainCopy);
+  // The error listener is registered once; a ref keeps its fallback in the current language.
+  const failedRef = useRef(t.failed);
+  failedRef.current = t.failed;
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +82,7 @@ export function ExplainApp() {
           ? p
           : p && typeof p === "object" && "message" in p && typeof (p as { message?: unknown }).message === "string"
             ? (p as { message: string }).message
-            : "Failed to explain.";
+            : failedRef.current;
       setError(msg);
     }));
 
@@ -104,12 +110,12 @@ export function ExplainApp() {
       >
         <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
           <h2 id="explain-title" className="text-sm font-medium tracking-tight text-foreground/90">
-            Explain selection
+            {t.title}
           </h2>
           <button
             type="button"
             className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            aria-label="Close"
+            aria-label={t.close}
             onClick={() => void closeExplain()}
           >
             <X className="size-4" />

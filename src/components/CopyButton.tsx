@@ -1,6 +1,8 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useCopy } from "@/i18n";
+import { historyCopy } from "@/i18n/history";
 import { tauri } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 
@@ -10,8 +12,8 @@ export function CopyButton({
   text,
   variant = "default",
   size = "sm",
-  label = "Copiar",
-  copiedLabel = "Copiado",
+  label,
+  copiedLabel,
   className,
 }: {
   text: string;
@@ -21,6 +23,7 @@ export function CopyButton({
   copiedLabel?: string;
   className?: string;
 }) {
+  const t = useCopy(historyCopy);
   const [copied, setCopied] = useState(false);
 
   const onCopy = async () => {
@@ -45,12 +48,12 @@ export function CopyButton({
       {copied ? (
         <>
           <Check className="size-3.5" strokeWidth={2.5} />
-          <span>{copiedLabel}</span>
+          <span>{copiedLabel ?? t.copied}</span>
         </>
       ) : (
         <>
           <Copy className="size-3.5" strokeWidth={2.25} />
-          <span>{label}</span>
+          <span>{label ?? t.copy}</span>
         </>
       )}
     </Button>

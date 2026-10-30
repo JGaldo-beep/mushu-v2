@@ -6,27 +6,26 @@ import { GlassSelect } from "@/components/GlassSelect";
 import { GlassToggle } from "@/components/GlassToggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAIFeatures } from "@/hooks/useAIFeatures";
+import { useCopy, useLanguage } from "@/i18n";
+import { aiFeaturesCopy } from "@/i18n/aiFeatures";
+import type { UiLanguage } from "@/lib/types";
 
-const LANGUAGES = [
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "pt", label: "Portuguese" },
-  { value: "it", label: "Italian" },
-  { value: "nl", label: "Dutch" },
-  { value: "pl", label: "Polish" },
-  { value: "ru", label: "Russian" },
-  { value: "tr", label: "Turkish" },
-  { value: "ar", label: "Arabic" },
-  { value: "hi", label: "Hindi" },
-  { value: "ja", label: "Japanese" },
-  { value: "ko", label: "Korean" },
-  { value: "zh", label: "Chinese (Simplified)" },
-];
+// Stored values are the codes; names come from Intl in the app's language. "zh" is
+// translated to Simplified Chinese, hence zh-Hans for its name.
+const TARGET_LANGUAGES = ["en", "es", "fr", "de", "pt", "it", "nl", "pl", "ru", "tr", "ar", "hi", "ja", "ko", "zh"];
+
+function languageOptions(lang: UiLanguage) {
+  const names = new Intl.DisplayNames([lang], { type: "language" });
+  return TARGET_LANGUAGES.map((code) => {
+    const name = names.of(code === "zh" ? "zh-Hans" : code) ?? code;
+    return { value: code, label: name.charAt(0).toLocaleUpperCase(lang) + name.slice(1) };
+  });
+}
 
 export function AIFeaturesPage() {
   const ai = useAIFeatures();
+  const t = useCopy(aiFeaturesCopy);
+  const lang = useLanguage();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -48,7 +47,7 @@ export function AIFeaturesPage() {
                 margin: 0,
               }}
             >
-              AI Features
+              {t.title}
             </h1>
             <p
               style={{
@@ -59,7 +58,7 @@ export function AIFeaturesPage() {
                 marginTop: "2px",
               }}
             >
-              AI layers applied to your transcriptions
+              {t.subtitle}
             </p>
           </div>
         </div>
@@ -70,16 +69,16 @@ export function AIFeaturesPage() {
           <InfoCard
             icon={Sparkles}
             color="var(--primary)"
-            title="Agent mode"
-            description="If you select text before dictating, Mushu uses what you say as the instruction and replaces the selection with the result. No extra shortcut or configuration."
-            example='Example: select "Hi, how are you?" → hold the shortcut + say "translate to Spanish" → replaces with "Hola, ¿cómo estás?".'
+            title={t.agentTitle}
+            description={t.agentBody}
+            example={t.agentExample}
           />
 
           <FeatureCard
             icon={Languages}
             color="var(--chart-2)"
-            title="Auto-translate"
-            description="Automatically translates to the selected language."
+            title={t.translateTitle}
+            description={t.translateBody}
             value={ai.autoTranslateEnabled}
             onChange={(v) => ai.setField("autoTranslateEnabled", v)}
             extra={
@@ -94,12 +93,12 @@ export function AIFeaturesPage() {
                       textTransform: "uppercase",
                     }}
                   >
-                    Target language
+                    {t.targetLanguage}
                   </span>
                   <div style={{ minWidth: "180px" }}>
                     <GlassSelect
                       value={ai.autoTranslateTarget}
-                      options={LANGUAGES}
+                      options={languageOptions(lang)}
                       onChange={(v) => ai.setField("autoTranslateTarget", v)}
                     />
                   </div>
@@ -119,7 +118,7 @@ export function AIFeaturesPage() {
             lineHeight: 1.5,
           }}
         >
-          These features run after your voice is transcribed. Toggle them on or off any time.
+          {t.footnote}
         </p>
       </div>
     </div>

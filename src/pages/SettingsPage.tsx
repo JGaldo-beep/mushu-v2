@@ -29,19 +29,13 @@ import { Slider } from "@/components/ui/slider";
 import { useAudioDevices } from "@/hooks/useAudioDevices";
 import { useSettings } from "@/hooks/useSettings";
 import { useSpokenLanguage } from "@/hooks/useSpokenLanguage";
+import { useCopy } from "@/i18n";
+import { settingsCopy } from "@/i18n/settings";
 import { tauri } from "@/lib/tauri";
-import type { DeepgramReplacement } from "@/lib/types";
+import type { DeepgramReplacement, UiLanguagePref } from "@/lib/types";
 import { version as APP_VERSION } from "../../package.json";
 
-const LANGUAGES = [
-  { value: "auto", label: "Auto-detect" },
-  { value: "es", label: "Spanish" },
-  { value: "en", label: "English" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "pt", label: "Portuguese" },
-  { value: "it", label: "Italian" },
-];
+const SPOKEN_LANGUAGES = ["auto", "es", "en", "fr", "de", "pt", "it"];
 
 function SectionHeader({
   title,
@@ -198,6 +192,7 @@ function HotkeyCapture({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const t = useCopy(settingsCopy);
   const [capturing, setCapturing] = useState(false);
   const [preview, setPreview] = useState("");
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -260,7 +255,7 @@ function HotkeyCapture({
           animation: "pulse 1.4s ease-in-out infinite",
         }}
       >
-        {preview ? <KeyChips combo={preview} dim /> : "Press the combination…"}
+        {preview ? <KeyChips combo={preview} dim /> : t.pressCombo}
       </button>
     );
   }
@@ -280,7 +275,7 @@ function HotkeyCapture({
           color: "var(--muted-foreground)",
         }}
       >
-        Change
+        {t.change}
       </button>
     </div>
   );
@@ -289,6 +284,7 @@ function HotkeyCapture({
 export function SettingsPage() {
   const { draft, loading, saving, isDirty, setField, save, reset, refresh } = useSettings();
   const { language, setLanguage } = useSpokenLanguage();
+  const t = useCopy(settingsCopy);
   const {
     devices: audioDevices,
     defaultLabel: defaultMicLabel,
@@ -305,7 +301,7 @@ export function SettingsPage() {
     try {
       await tauri.saveDeepgramApiKey(dgKeyInput.trim());
       setDgKeyInput("");
-      toast.success("Activation code saved");
+      toast.success(t.codeSaved);
     } catch (e) {
       toast.error(String(e));
     } finally {
@@ -317,7 +313,7 @@ export function SettingsPage() {
     setDgKeySaving(true);
     try {
       await tauri.saveDeepgramApiKey("");
-      toast.success("Activation code removed");
+      toast.success(t.codeRemoved);
     } catch (e) {
       toast.error(String(e));
     } finally {
@@ -343,7 +339,7 @@ export function SettingsPage() {
   const onSave = async () => {
     try {
       await save();
-      toast.success("Settings saved");
+      toast.success(t.settingsSaved);
     } catch (e) {
       toast.error(String(e));
     }
@@ -351,7 +347,7 @@ export function SettingsPage() {
 
   const onRefreshMics = async () => {
     await Promise.all([refresh(), refreshAudioDevices()]);
-    toast.success("Microphone list refreshed");
+    toast.success(t.micsRefreshed);
   };
 
   // A chosen microphone that is not connected shows as "System default" — that is what
@@ -364,7 +360,7 @@ export function SettingsPage() {
   const micOptions = [
     {
       value: "__default__",
-      label: defaultMicLabel ? `System default — ${defaultMicLabel}` : "System default",
+      label: defaultMicLabel ? t.systemDefaultNamed(defaultMicLabel) : t.systemDefault,
     },
     ...audioDevices.map((d) => ({ value: d.deviceId, label: d.label })),
   ];
@@ -394,7 +390,7 @@ export function SettingsPage() {
               letterSpacing: "-0.01em",
             }}
           >
-            Settings
+            {t.title}
           </p>
           <p
             style={{
@@ -404,7 +400,7 @@ export function SettingsPage() {
               color: "var(--text-muted)",
             }}
           >
-            Preferences saved on this device
+            {t.subtitle}
           </p>
         </div>
       </div>
@@ -421,24 +417,42 @@ export function SettingsPage() {
           {/* General */}
           <GlassCard className="overflow-hidden">
             <SectionHeader
-              title="General"
+              title={t.general}
               icon={Globe}
-              description="Dictation language, help, and about"
+              description={t.generalHint}
             />
             <SettingRow
-              label="Spoken language"
-              description="Improves accuracy when you always dictate in the same language."
+              label={t.appLanguage}
+              description={t.appLanguageHint}
+              control={
+                <GlassSelect
+                  value={draft?.ui_language ?? "auto"}
+                  options={[
+                    { value: "auto", label: t.appLanguageAuto },
+                    // Each language names itself, so it can be found from either one.
+                    { value: "es", label: "Español" },
+                    { value: "en", label: "English" },
+                  ]}
+                  // Applies at once, outside the save bar: the whole UI switches on change.
+                  onChange={(v) => void tauri.setUiLanguage(v as UiLanguagePref).catch(() => {})}
+                  className="w-56"
+                />
+              }
+            />
+            <SettingRow
+              label={t.spokenLanguage}
+              description={t.spokenLanguageHint}
               control={
                 <GlassSelect
                   value={language}
-                  options={LANGUAGES}
+                  options={SPOKEN_LANGUAGES.map((value) => ({ value, label: t.spokenLanguages[value] }))}
                   onChange={setLanguage}
                   className="w-56"
                 />
               }
             />
             <SettingRow
-              label="About Mushu"
+              label={t.about}
               description={
                 <span className="inline-flex items-center gap-2">
                   <Info size={12} strokeWidth={2} style={{ color: "var(--text-muted)" }} />
@@ -455,13 +469,13 @@ export function SettingsPage() {
           {/* Recording */}
           <GlassCard className="overflow-hidden">
             <SectionHeader
-              title="Recording"
+              title={t.recording}
               icon={Mic}
-              description="Microphone and sound feedback"
+              description={t.recordingHint}
             />
             <SettingRow
-              label="Microphone"
-              description="System default if you don't pick one, or when yours is disconnected."
+              label={t.microphone}
+              description={t.microphoneHint}
               control={
                 <div className="flex items-center gap-2">
                   <GlassSelect
@@ -474,7 +488,8 @@ export function SettingsPage() {
                     type="button"
                     className="glass-btn rounded-lg p-2"
                     onClick={onRefreshMics}
-                    title="Refresh list"
+                    title={t.refreshList}
+                    aria-label={t.refreshList}
                   >
                     <RefreshCw style={{ width: "14px", height: "14px" }} />
                   </button>
@@ -482,8 +497,8 @@ export function SettingsPage() {
               }
             />
             <SettingRow
-              label="Switch to new microphones"
-              description="Use headphones or a mic as soon as you connect them."
+              label={t.autoSwitch}
+              description={t.autoSwitchHint}
               control={
                 <GlassToggle
                   value={draft?.auto_switch_microphone ?? true}
@@ -492,8 +507,8 @@ export function SettingsPage() {
               }
             />
             <SettingRow
-              label="Sound effects"
-              description="Chime when recording starts and stops."
+              label={t.sounds}
+              description={t.soundsHint}
               control={
                 <GlassToggle
                   value={draft?.sound_effects_enabled ?? true}
@@ -502,8 +517,8 @@ export function SettingsPage() {
               }
             />
             <SettingRow
-              label="Stop recording on Enter"
-              description="Press Enter to finish dictating and insert the text."
+              label={t.stopOnEnter}
+              description={t.stopOnEnterHint}
               control={
                 <GlassToggle
                   value={draft?.stop_on_enter ?? false}
@@ -512,7 +527,7 @@ export function SettingsPage() {
               }
             />
             <SettingRow
-              label="Volume"
+              label={t.volume}
               isLast
               control={
                 <div className="flex w-44 items-center gap-2">
@@ -543,17 +558,13 @@ export function SettingsPage() {
           {/* Transcription */}
           <GlassCard className="overflow-hidden">
             <SectionHeader
-              title="Transcription"
+              title={t.transcription}
               icon={Waves}
-              description="Turns your voice into text as you dictate"
+              description={t.transcriptionHint}
             />
             <SettingRow
-              label="Active mode"
-              description={
-                draft?.has_deepgram_direct_key
-                  ? "Enhanced transcription active: auto language detection, punctuation, and numerals."
-                  : "Standard transcription. Upgrade to premium for higher accuracy."
-              }
+              label={t.activeMode}
+              description={draft?.has_deepgram_direct_key ? t.modePremiumHint : t.modeStandardHint}
               control={
                 <span
                   className="inline-flex items-center rounded-full px-2.5 py-1"
@@ -580,17 +591,13 @@ export function SettingsPage() {
                     letterSpacing: "0.08em",
                   }}
                 >
-                  {draft?.has_deepgram_direct_key ? "Premium" : draft?.account ? "Standard" : "Offline"}
+                  {draft?.has_deepgram_direct_key ? t.premium : draft?.account ? t.standard : t.offline}
                 </span>
               }
             />
             <SettingRow
-              label="Activation code"
-              description={
-                draft?.has_deepgram_direct_key
-                  ? "Code saved. Enter a new one to update."
-                  : "Enter your code to activate premium transcription."
-              }
+              label={t.activationCode}
+              description={draft?.has_deepgram_direct_key ? t.codeSavedHint : t.codeEnterHint}
               isLast
               control={
                 <div className="flex items-center gap-2">
@@ -608,7 +615,7 @@ export function SettingsPage() {
                         color: "var(--destructive)",
                       }}
                     >
-                      Deactivate
+                      {t.deactivate}
                     </button>
                   ) : null}
                   <div className="relative flex items-center">
@@ -616,7 +623,8 @@ export function SettingsPage() {
                       type={dgKeyVisible ? "text" : "password"}
                       value={dgKeyInput}
                       onChange={(e) => setDgKeyInput(e.target.value)}
-                      placeholder="Code..."
+                      placeholder={t.codePlaceholder}
+                      aria-label={t.activationCode}
                       className="glass-input rounded-lg pr-8"
                       style={{
                         fontFamily: "'Space Mono', monospace",
@@ -646,7 +654,7 @@ export function SettingsPage() {
                       fontWeight: 500,
                     }}
                   >
-                    {dgKeySaving ? "Saving…" : "Save"}
+                    {dgKeySaving ? t.saving : t.save}
                   </button>
                 </div>
               }
@@ -656,9 +664,9 @@ export function SettingsPage() {
           {/* Find & Replace */}
           <GlassCard className="overflow-hidden">
             <SectionHeader
-              title="Find & replace"
+              title={t.replace}
               icon={Replace}
-              description="Fix words Mushu mistranscribes — applied in real time"
+              description={t.replaceHint}
             />
             <div className="px-4 pb-3">
               {replacements.length === 0 && (
@@ -671,7 +679,7 @@ export function SettingsPage() {
                     paddingBottom: "4px",
                   }}
                 >
-                  No replacements yet. Add pairs to fix mistranscribed words.
+                  {t.replaceEmpty}
                 </p>
               )}
               {replacements.map((r, i) => (
@@ -680,7 +688,7 @@ export function SettingsPage() {
                     type="text"
                     value={r.from}
                     onChange={(e) => updateReplacement(i, "from", e.target.value)}
-                    placeholder="find"
+                    placeholder={t.find}
                     className="glass-input flex-1 rounded-lg"
                     style={{
                       fontFamily: "'Space Mono', monospace",
@@ -694,7 +702,7 @@ export function SettingsPage() {
                     type="text"
                     value={r.to}
                     onChange={(e) => updateReplacement(i, "to", e.target.value)}
-                    placeholder="replace with"
+                    placeholder={t.replaceWith}
                     className="glass-input flex-1 rounded-lg"
                     style={{
                       fontFamily: "'Space Mono', monospace",
@@ -707,7 +715,8 @@ export function SettingsPage() {
                     type="button"
                     className="glass-btn rounded-lg p-1.5"
                     onClick={() => removeReplacement(i)}
-                    title="Remove"
+                    title={t.remove}
+                    aria-label={t.remove}
                   >
                     <X size={13} />
                   </button>
@@ -724,7 +733,7 @@ export function SettingsPage() {
                 }}
               >
                 <Plus size={13} />
-                Add pair
+                {t.addPair}
               </button>
             </div>
           </GlassCard>
@@ -732,13 +741,13 @@ export function SettingsPage() {
           {/* Shortcuts */}
           <GlassCard className="overflow-hidden">
             <SectionHeader
-              title="Shortcuts"
+              title={t.shortcuts}
               icon={Keyboard}
-              description="Click 'Change' and then press the key combination you want"
+              description={t.shortcutsHint}
             />
             <SettingRow
-              label="Dictation"
-              description="Hold to record; quick tap for hands-free."
+              label={t.dictation}
+              description={t.dictationHint}
               control={
                 <HotkeyCapture
                   value={draft?.hotkey ?? ""}
@@ -747,8 +756,8 @@ export function SettingsPage() {
               }
             />
             <SettingRow
-              label="Push-to-talk"
-              description="Hold while you speak; release to send the text."
+              label={t.pushToTalk}
+              description={t.pushToTalkHint}
               control={
                 <HotkeyCapture
                   value={draft?.ptt_hotkey ?? ""}
@@ -757,8 +766,8 @@ export function SettingsPage() {
               }
             />
             <SettingRow
-              label="Switch voice agent"
-              description="Cycle through General and your Voice Agents without opening the app."
+              label={t.switchAgent}
+              description={t.switchAgentHint}
               control={
                 <HotkeyCapture
                   value={draft?.mode_hotkey ?? ""}
@@ -767,8 +776,8 @@ export function SettingsPage() {
               }
             />
             <SettingRow
-              label="Pause"
-              description="Pauses the recording without ending it. Press again to resume."
+              label={t.pause}
+              description={t.pauseHint}
               isLast
               control={
                 <HotkeyCapture
@@ -782,13 +791,13 @@ export function SettingsPage() {
           {/* Permissions */}
           <GlassCard className="overflow-hidden">
             <SectionHeader
-              title="Permissions"
+              title={t.permissions}
               icon={ShieldCheck}
-              description="Hardware and system access"
+              description={t.permissionsHint}
             />
             <SettingRow
-              label="Microphone"
-              description="Needed to capture your voice. If Mushu can't hear you, check your system permissions."
+              label={t.microphone}
+              description={t.micPermissionHint}
               isLast
               control={
                 <span
@@ -805,7 +814,7 @@ export function SettingsPage() {
                   }}
                 >
                   <Volume2 size={11} strokeWidth={2.5} />
-                  Granted
+                  {t.granted}
                 </span>
               }
             />
@@ -836,15 +845,15 @@ export function SettingsPage() {
                   color: "var(--foreground)",
                 }}
               >
-                You have unsaved changes.
+                {t.unsaved}
               </p>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={reset} disabled={saving}>
-                  Discard
+                  {t.discard}
                 </Button>
                 <Button size="sm" onClick={onSave} disabled={saving} className="gap-1.5">
                   <Save className="size-3.5" strokeWidth={2.25} />
-                  {saving ? "Saving…" : "Save changes"}
+                  {saving ? t.saving : t.saveChanges}
                 </Button>
               </div>
             </div>

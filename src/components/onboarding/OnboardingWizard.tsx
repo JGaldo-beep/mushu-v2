@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ShortcutKbd } from "@/components/ShortcutKbd";
 import { Button } from "@/components/ui/button";
 import { useAudioDevices } from "@/hooks/useAudioDevices";
+import { useCopy } from "@/i18n";
+import { onboardingCopy } from "@/i18n/onboarding";
 import { listen } from "@/lib/events";
 import { patchSettings, tauri } from "@/lib/tauri";
 import type { MushuAccount } from "@/lib/types";
@@ -20,6 +22,8 @@ type ConfettiStyle = CSSProperties & {
   "--ty": string;
   "--rot": string;
 };
+
+type T = (typeof onboardingCopy)["en"];
 
 const ease = [0.33, 1, 0.68, 1] as const;
 const stepTransition = { duration: 0.36, ease } as const;
@@ -41,6 +45,7 @@ export function OnboardingWizard({
   onComplete,
   onAuthChanged,
 }: Props) {
+  const t = useCopy(onboardingCopy);
   const [stepIndex, setStepIndex] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);
   const [busy, setBusy] = useState(false);
@@ -110,7 +115,7 @@ export function OnboardingWizard({
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              Step {String(stepIndex + 1).padStart(2, "0")} / {String(STEP_COUNT).padStart(2, "0")}
+              {t.step(String(stepIndex + 1).padStart(2, "0"), String(STEP_COUNT).padStart(2, "0"))}
             </span>
             <button
               type="button"
@@ -119,7 +124,7 @@ export function OnboardingWizard({
               className="text-[11px] uppercase text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
               style={{ letterSpacing: "0.14em" }}
             >
-              Skip
+              {t.skip}
             </button>
           </div>
 
@@ -174,7 +179,7 @@ export function OnboardingWizard({
               className="gap-1.5 text-muted-foreground"
             >
               <ArrowLeft size={14} strokeWidth={2} />
-              Back
+              {t.back}
             </Button>
 
             <div className="flex items-center gap-1.5" aria-hidden>
@@ -201,12 +206,12 @@ export function OnboardingWizard({
                 onClick={goNext}
                 className="gap-1.5"
               >
-                Next
+                {t.next}
                 <ArrowRight size={14} strokeWidth={2} />
               </Button>
             ) : (
               <Button type="button" size="sm" disabled={busy} onClick={() => void finish()}>
-                {busy ? "Finishing…" : "Start using Mushu"}
+                {busy ? t.finishing : t.start}
               </Button>
             )}
           </div>
@@ -260,16 +265,15 @@ function StepHeader({ numeral, title }: { numeral: string; title: string }) {
  * ------------------------------------------------------------------ */
 
 function WelcomeStep() {
+  const t = useCopy(onboardingCopy);
   return (
     <>
-      <StepHeader numeral="01" title="Welcome to Mushu" />
+      <StepHeader numeral="01" title={t.welcomeTitle} />
       <p
         className="text-foreground/85"
         style={{ fontSize: "15px", lineHeight: 1.6, maxWidth: "52ch" }}
       >
-        Mushu turns your voice into text, anywhere on your computer. Press a shortcut,
-        speak, and your words land wherever your cursor is — as raw dictation, a tidy
-        email, or a quick note.
+        {t.welcomeBody}
       </p>
       <div
         className="mt-2 inline-flex items-center gap-2 self-start rounded-full px-3 py-1"
@@ -283,7 +287,7 @@ function WelcomeStep() {
           className="text-[11px] text-muted-foreground"
           style={{ letterSpacing: "0.02em" }}
         >
-          Takes under a minute to set up
+          {t.welcomeBadge}
         </span>
       </div>
     </>
@@ -295,6 +299,7 @@ function WelcomeStep() {
  * ------------------------------------------------------------------ */
 
 function MicStep({ active }: { active: boolean }) {
+  const t = useCopy(onboardingCopy);
   const { devices, refresh, needsPermission } = useAudioDevices();
   const [deviceId, setDeviceId] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
@@ -325,12 +330,12 @@ function MicStep({ active }: { active: boolean }) {
 
   return (
     <>
-      <StepHeader numeral="02" title="Check your microphone" />
+      <StepHeader numeral="02" title={t.micTitle} />
       <p
         className="text-foreground/80"
         style={{ fontSize: "14.5px", lineHeight: 1.6, maxWidth: "52ch" }}
       >
-        Pick the mic you want Mushu to use, then say something. The bars should move.
+        {t.micBody}
       </p>
 
       <div className="flex items-center gap-2">
@@ -342,7 +347,7 @@ function MicStep({ active }: { active: boolean }) {
             style={{ border: "0.5px solid var(--border)" }}
           >
             {devices.length === 0 ? (
-              <option value="">System default</option>
+              <option value="">{t.micSystemDefault}</option>
             ) : (
               devices.map((d) => (
                 <option key={d.deviceId} value={d.deviceId}>
@@ -356,7 +361,7 @@ function MicStep({ active }: { active: boolean }) {
           type="button"
           onClick={() => void handleRefresh()}
           disabled={refreshing}
-          aria-label="Refresh microphone list"
+          aria-label={t.micRefresh}
           className="flex h-9 w-9 items-center justify-center rounded-md bg-card text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
           style={{ border: "0.5px solid var(--border)" }}
         >
@@ -379,18 +384,18 @@ function MicStep({ active }: { active: boolean }) {
         <MicBars level={level} active={active && !error} />
         <div className="mt-4 flex items-center justify-between gap-3 text-[12px]">
           {error ? (
-            <span className="text-destructive">{humanizeMicError(error)}</span>
+            <span className="text-destructive">{humanizeMicError(error, t)}</span>
           ) : needsPermission ? (
             <span className="text-muted-foreground">
-              Allow microphone access when Windows prompts you.
+              {t.micAllow}
             </span>
           ) : hasSignal ? (
             <span className="inline-flex items-center gap-1.5 text-foreground">
               <Check size={12} strokeWidth={2.4} />
-              We can hear you
+              {t.micHeard}
             </span>
           ) : (
-            <span className="text-muted-foreground">Speak to test…</span>
+            <span className="text-muted-foreground">{t.micSpeak}</span>
           )}
           <span
             className="text-muted-foreground"
@@ -572,25 +577,25 @@ function ShortcutsStep({
   dictationParts: string[];
   pttParts: string[];
 }) {
+  const t = useCopy(onboardingCopy);
   return (
     <>
-      <StepHeader numeral="03" title="Your two shortcuts" />
+      <StepHeader numeral="03" title={t.shortcutsTitle} />
       <p
         className="text-foreground/80"
         style={{ fontSize: "14.5px", lineHeight: 1.6, maxWidth: "52ch" }}
       >
-        Mushu records in two ways. Pick whichever feels natural — you can change either
-        one in Settings → Shortcuts.
+        {t.shortcutsBody}
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <ShortcutCard
-          label="Dictation"
-          description="Tap to start. Tap again or press ESC to send."
+          label={t.dictationLabel}
+          description={t.dictationHint}
           keys={dictationParts}
         />
         <ShortcutCard
-          label="Push-to-talk"
-          description="Hold while you speak. Release to send."
+          label={t.pttLabel}
+          description={t.pttHint}
           keys={pttParts}
         />
       </div>
@@ -644,6 +649,7 @@ function SignInStep({
   onAuthChanged: () => void;
   onAdvance: () => void;
 }) {
+  const t = useCopy(onboardingCopy);
   const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -677,22 +683,23 @@ function SignInStep({
       await tauri.openExternalUrl(`${base}/login`);
       setWaiting(true);
     } catch (e) {
-      setError(humanizeAuthError(e));
+      setError(humanizeAuthError(e, t));
     }
   };
 
   if (signedInEmail) {
     return (
       <>
-        <StepHeader numeral="04" title="You're signed in" />
+        <StepHeader numeral="04" title={t.signedInTitle} />
         <p
           className="text-foreground/80"
           style={{ fontSize: "14.5px", lineHeight: 1.6, maxWidth: "52ch" }}
         >
-          Welcome,{" "}
-          <span className="text-foreground font-medium">{signedInEmail}</span>. Your
-          minutes and usage will sync with{" "}
-          <span className="text-foreground">mushu.space</span> automatically.
+          {t.signedInBefore}
+          <span className="text-foreground font-medium">{signedInEmail}</span>
+          {t.signedInMiddle}
+          <span className="text-foreground">mushu.space</span>
+          {t.signedInAfter}
         </p>
         <div
           className="inline-flex items-center gap-2 self-start rounded-full px-3 py-1.5"
@@ -706,7 +713,7 @@ function SignInStep({
             className="text-[11.5px] text-foreground"
             style={{ letterSpacing: "0.02em" }}
           >
-            Trial active
+            {t.trialActive}
           </span>
         </div>
         <Button
@@ -715,7 +722,7 @@ function SignInStep({
           onClick={onAdvance}
           className="mt-1 self-start gap-1.5"
         >
-          Continue
+          {t.continue}
           <ArrowRight size={14} strokeWidth={2} />
         </Button>
       </>
@@ -724,13 +731,14 @@ function SignInStep({
 
   return (
     <>
-      <StepHeader numeral="04" title="Activate your trial" />
+      <StepHeader numeral="04" title={t.signInTitle} />
       <p
         className="text-foreground/80"
         style={{ fontSize: "14.5px", lineHeight: 1.6, maxWidth: "52ch" }}
       >
-        Sign in on <span className="text-foreground">mushu.space</span> to sync your
-        minutes and usage. Works with Google or email — your browser handles it.
+        {t.signInBefore}
+        <span className="text-foreground">mushu.space</span>
+        {t.signInAfter}
       </p>
 
       <div
@@ -749,10 +757,10 @@ function SignInStep({
                   className="text-[13.5px] text-foreground"
                   style={{ fontWeight: 500 }}
                 >
-                  Waiting for your sign-in…
+                  {t.waiting}
                 </span>
                 <span className="text-[11.5px] text-muted-foreground">
-                  Finish in your browser. We'll pick it up automatically.
+                  {t.waitingHint}
                 </span>
               </div>
             </div>
@@ -765,14 +773,14 @@ function SignInStep({
                 className="gap-1.5"
               >
                 <ExternalLink size={13} strokeWidth={2.2} />
-                Reopen browser
+                {t.reopenBrowser}
               </Button>
               <button
                 type="button"
                 onClick={() => setWaiting(false)}
                 className="text-[11.5px] text-muted-foreground transition-colors hover:text-foreground"
               >
-                Cancel
+                {t.cancel}
               </button>
             </div>
           </div>
@@ -785,12 +793,12 @@ function SignInStep({
               className="gap-2 self-start"
             >
               <ExternalLink size={14} strokeWidth={2.2} />
-              Continue in browser
+              {t.continueInBrowser}
             </Button>
             <p className="text-[11.5px] text-muted-foreground" style={{ lineHeight: 1.5 }}>
-              New here? You can create an account on{" "}
-              <span className="text-foreground">mushu.space</span> with the same button —
-              sign-up and sign-in use the same flow.
+              {t.newHereBefore}
+              <span className="text-foreground">mushu.space</span>
+              {t.newHereAfter}
             </p>
           </>
         )}
@@ -805,8 +813,9 @@ function SignInStep({
         className="text-muted-foreground"
         style={{ fontSize: "11.5px", lineHeight: 1.5 }}
       >
-        You can skip this for now, but dictation needs an account. Sign in any time
-        from <span className="text-foreground">Settings → Account</span>.
+        {t.skipSignInBefore}
+        <span className="text-foreground">{t.settingsAccount}</span>
+        {t.skipSignInAfter}
       </p>
     </>
   );
@@ -827,18 +836,19 @@ function DoneStep({
   onFinish: () => void;
   busy: boolean;
 }) {
+  const t = useCopy(onboardingCopy);
   return (
     <>
-      <StepHeader numeral="05" title={signedInEmail ? "You're all set" : "Almost there"} />
+      <StepHeader numeral="05" title={signedInEmail ? t.doneTitle : t.almostTitle} />
       <p
         className="text-foreground/80"
         style={{ fontSize: "14.5px", lineHeight: 1.6, maxWidth: "52ch" }}
       >
-        Open any app where you can type, then tap{" "}
+        {t.doneBefore}{" "}
         <span className="inline-flex translate-y-[1px] items-center align-middle">
           <ShortcutKbd keys={dictationParts} size="sm" />
         </span>{" "}
-        and start speaking. Your transcript appears right where your cursor is.
+        {t.doneAfter}
       </p>
 
       <p
@@ -847,15 +857,17 @@ function DoneStep({
       >
         {signedInEmail ? (
           <>
-            Signed in as{" "}
-            <span className="text-foreground">{signedInEmail}</span>. Manage minutes and
-            usage from <span className="text-foreground">Settings → Account</span>.
+            {t.doneSignedInBefore}
+            <span className="text-foreground">{signedInEmail}</span>
+            {t.doneSignedInMiddle}
+            <span className="text-foreground">{t.settingsAccount}</span>
+            {t.doneSignedInAfter}
           </>
         ) : (
           <>
-            One step left: sign in from{" "}
-            <span className="text-foreground">Settings → Account</span>. Dictation stays off
-            until you do.
+            {t.doneSignedOutBefore}
+            <span className="text-foreground">{t.settingsAccount}</span>
+            {t.doneSignedOutAfter}
           </>
         )}
       </p>
@@ -867,7 +879,7 @@ function DoneStep({
         onClick={onFinish}
         className="mt-1 self-start"
       >
-        {busy ? "Finishing…" : "Start using Mushu"}
+        {busy ? t.finishing : t.start}
       </Button>
     </>
   );
@@ -934,19 +946,15 @@ function ConfettiBurst() {
  * Helpers
  * ------------------------------------------------------------------ */
 
-function humanizeAuthError(err: unknown): string {
+function humanizeAuthError(err: unknown, t: T): string {
   const raw = err instanceof Error ? err.message : String(err);
-  if (/invalid.*credentials|invalid_grant/i.test(raw))
-    return "Email or password didn't match. Try again.";
-  if (/network|fetch|timeout/i.test(raw))
-    return "Couldn't reach mushu.space. Check your connection and try again.";
+  if (/invalid.*credentials|invalid_grant/i.test(raw)) return t.authMismatch;
+  if (/network|fetch|timeout/i.test(raw)) return t.authNetwork;
   return raw;
 }
 
-function humanizeMicError(raw: string): string {
-  if (/permission|denied|notallowed/i.test(raw))
-    return "Microphone access is blocked. Allow it in Windows Settings → Privacy → Microphone.";
-  if (/notfound|device/i.test(raw))
-    return "No microphone found. Plug one in and tap refresh.";
-  return "Couldn't open the microphone. Try a different device.";
+function humanizeMicError(raw: string, t: T): string {
+  if (/permission|denied|notallowed/i.test(raw)) return t.micBlocked;
+  if (/notfound|device/i.test(raw)) return t.micNotFound;
+  return t.micFailed;
 }

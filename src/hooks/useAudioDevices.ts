@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { useCopy } from "@/i18n";
+import { overlayCopy } from "@/i18n/overlay";
 import { listMicrophones, type AudioDevice } from "@/lib/audioDevices";
 
 export type { AudioDevice };
@@ -15,20 +17,21 @@ async function ensureMicPermission(): Promise<void> {
 }
 
 export function useAudioDevices() {
+  const { microphoneN } = useCopy(overlayCopy);
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [defaultLabel, setDefaultLabel] = useState<string | null>(null);
   const [needsPermission, setNeedsPermission] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
-      const list = await listMicrophones();
+      const list = await listMicrophones(microphoneN);
       setDevices(list.devices);
       setDefaultLabel(list.defaultLabel);
       setNeedsPermission(list.missingLabels);
     } catch (err) {
       console.warn("[useAudioDevices] enumerate failed:", err);
     }
-  }, []);
+  }, [microphoneN]);
 
   useEffect(() => {
     let cancelled = false;
