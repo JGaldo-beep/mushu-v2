@@ -155,7 +155,6 @@
   backdrop-filter: blur(22px) saturate(130%);
   -webkit-backdrop-filter: blur(22px) saturate(130%);
   border: 1px solid var(--overlay-pill-border);
-  border-radius: 999px;
   box-shadow: var(--overlay-pill-shadow);
 }
 
@@ -167,6 +166,7 @@
   justify-content: center;
   width: 92px;
   height: 32px;
+  border-radius: 999px;
   transition: width 0.22s cubic-bezier(0.33, 1, 0.68, 1);
 }
 

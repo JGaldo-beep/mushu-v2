@@ -401,11 +401,13 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                 transition={{ duration: 0.22 }}
                 className="relative flex h-56 w-full items-center justify-center"
               >
-                <Ripple
-                  mainCircleSize={110 + audioLevel * 80}
-                  mainCircleOpacity={0.12 + audioLevel * 0.3}
-                  numCircles={5}
-                />
+                <div className="motion-reduce:hidden">
+                  <Ripple
+                    mainCircleSize={110 + audioLevel * 80}
+                    mainCircleOpacity={0.12 + audioLevel * 0.3}
+                    numCircles={5}
+                  />
+                </div>
                 <div className="relative z-10 flex flex-col items-center gap-3">
                   <div
                     className="flex items-center gap-2 px-3 py-1"
@@ -427,7 +429,7 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     ) : (
                       <span className="relative flex size-2">
                         <span
-                          className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                          className="absolute inline-flex h-full w-full rounded-full opacity-75 motion-safe:animate-ping"
                           style={{ background: "var(--destructive)" }}
                         />
                         <span
@@ -473,15 +475,15 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
               >
                 <div className="flex gap-1.5">
                   <span
-                    className="size-2 animate-bounce rounded-full [animation-delay:-0.3s]"
+                    className="size-2 rounded-full motion-safe:animate-bounce [animation-delay:-0.3s]"
                     style={{ background: "var(--foreground)" }}
                   />
                   <span
-                    className="size-2 animate-bounce rounded-full [animation-delay:-0.15s]"
+                    className="size-2 rounded-full motion-safe:animate-bounce [animation-delay:-0.15s]"
                     style={{ background: "var(--foreground)" }}
                   />
                   <span
-                    className="size-2 animate-bounce rounded-full"
+                    className="size-2 rounded-full motion-safe:animate-bounce"
                     style={{ background: "var(--foreground)" }}
                   />
                 </div>
@@ -530,9 +532,9 @@ export function HomePage({ onNavigate }: HomePageProps = {}) {
                     <CopyButton text={resultText} variant="ghost" />
                   </div>
                   <TextAnimate
-                    animation="blurInUp"
-                    by="word"
-                    duration={0.5}
+                    animation="fadeIn"
+                    by="text"
+                    duration={0.2}
                     once
                     startOnView={false}
                     style={{

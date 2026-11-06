@@ -11,8 +11,8 @@ import { useCopy } from "@/i18n";
 import { overlayCopy } from "@/i18n/overlay";
 import { cn } from "@/lib/utils";
 
-const ease = [0.33, 1, 0.68, 1] as const;
-const transition = { duration: 0.22, ease } as const;
+const transition = { duration: 0.14, ease: [0.23, 1, 0.32, 1] } as const;
+const exitTransition = { duration: 0.1, ease: "easeIn" } as const;
 
 // The pill carries one thing at a time: the wave, the thinking dots, or the agent
 // name for a moment after it changes. No badge, no logo, no live transcript — at
@@ -26,7 +26,6 @@ export function Overlay() {
     modeBannerOnly,
     bannerText,
     mushuReplyText,
-    modePopToken,
     isProcessing,
     isReply,
     showPill,
@@ -45,12 +44,12 @@ export function Overlay() {
         {showPill && (
           <motion.div
             key="pill-shell"
-            initial={{ opacity: 0, scale: 0.96 }}
+            initial={{ opacity: 0, scale: 0.97 }}
             animate={{
               opacity: transcriptionFadeOut ? 0 : 1,
-              scale: transcriptionFadeOut ? 0.96 : 1,
+              scale: transcriptionFadeOut ? 0.97 : 1,
             }}
-            exit={{ opacity: 0, scale: 0.96 }}
+            exit={{ opacity: 0, scale: 0.97, transition: exitTransition }}
             transition={transition}
             className={cn(
               "overlay-pill-surface text-foreground",
@@ -62,19 +61,19 @@ export function Overlay() {
               {isReply && mushuReplyText !== null ? (
                 <motion.div
                   key="reply"
-                  initial={{ opacity: 0, scale: 0.96 }}
+                  initial={{ opacity: 0, scale: 0.97 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
+                  exit={{ opacity: 0, scale: 0.97, transition: exitTransition }}
                   transition={transition}
                 >
                   <MushuReplyCard text={mushuReplyText} />
                 </motion.div>
               ) : modeBannerOnly ? (
                 <motion.span
-                  key={`agent-${modePopToken}`}
+                  key="agent"
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
+                  exit={{ opacity: 0, y: -4, transition: exitTransition }}
                   transition={transition}
                   className="overlay-agent-label"
                 >
@@ -85,7 +84,7 @@ export function Overlay() {
                   key="processing"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
+                  exit={{ opacity: 0, transition: exitTransition }}
                   transition={transition}
                 >
                   {showThinking ? (
@@ -101,7 +100,7 @@ export function Overlay() {
                   key="paused"
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
+                  exit={{ opacity: 0, y: -4, transition: exitTransition }}
                   transition={transition}
                   className="overlay-paused-label"
                   role="status"
@@ -114,7 +113,7 @@ export function Overlay() {
                   key="wave"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
+                  exit={{ opacity: 0, transition: exitTransition }}
                   transition={transition}
                 >
                   <WaveBars

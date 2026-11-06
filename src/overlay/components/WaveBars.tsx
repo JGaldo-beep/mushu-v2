@@ -34,6 +34,7 @@ export function WaveBars({
 
   useEffect(() => {
     let raf = 0;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const tick = (now: number) => {
       const targets = new Array<number>(BAR_COUNT);
       if (idleRef.current) {
@@ -44,10 +45,9 @@ export function WaveBars({
         const lv = Math.max(0, Math.min(1, levelRef.current));
         for (let i = 0; i < BAR_COUNT; i++) {
           const center = 1 - Math.abs(i - (BAR_COUNT - 1) / 2) / ((BAR_COUNT - 1) / 2);
-          const pulse =
-            0.58 +
-            Math.sin(now / 86 + i * 0.72) * 0.22 +
-            Math.sin(now / 137 + i * 1.31) * 0.14;
+          const pulse = still
+            ? 0.8
+            : 0.58 + Math.sin(now / 86 + i * 0.72) * 0.22 + Math.sin(now / 137 + i * 1.31) * 0.14;
           const voice = Math.max(0, Math.min(1, lv * (barSeeds[i] + center * 0.45) * pulse));
           targets[i] = MIN_H + voice * (MAX_H - MIN_H);
         }
