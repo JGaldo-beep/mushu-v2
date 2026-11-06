@@ -1,6 +1,6 @@
-import { History as HistoryIcon, Search, Trash2 } from "lucide-react";
+import { ChevronDown, History as HistoryIcon, Search, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/Skeleton";
-import { useMemo, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CopyButton } from "@/components/CopyButton";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { HISTORY_BADGE_COLOR, historyBadgeTint, historyIcon, historyLabel } from
 import { useCopy, useLanguage } from "@/i18n";
 import { historyCopy, type HistoryCopy } from "@/i18n/history";
 import type { HistoryItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface HistoryPageProps {
   /** When true, render inside a Sheet (no SidebarTrigger, no global topbar). */
@@ -281,9 +282,33 @@ function HistoryRow({ item }: { item: HistoryItem }) {
   const label = historyLabel(item.mode_used, t);
   const text = item.processed_text || item.raw_text;
   const words = text.split(/\s+/).filter(Boolean).length;
+  // A voice agent rewrote it: the expanded row also shows what was actually said.
+  const original =
+    item.processed_text && item.raw_text && item.raw_text.trim() !== item.processed_text.trim()
+      ? item.raw_text
+      : null;
+
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const textId = useId();
+
+  // Only rows whose text runs past two lines get a toggle. Measured on the clamped
+  // paragraph, and again whenever the list resizes and the line count changes.
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el || expanded) return;
+    const measure = () => setOverflows(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [text, expanded]);
+
+  const canExpand = overflows || Boolean(original);
 
   return (
-    <GlassCard className="group p-4 transition-all" style={{ cursor: "default" }}>
+    <GlassCard className="group p-4" style={{ cursor: "default" }}>
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span
@@ -312,28 +337,80 @@ function HistoryRow({ item }: { item: HistoryItem }) {
           text={text}
           variant="ghost"
           size="sm"
-          className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+          className="opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
         />
       </div>
 
-      <p
-        className="line-clamp-2"
-        style={{
-          fontFamily: "'Geist Variable', sans-serif",
-          fontSize: "13px",
-          fontWeight: 450,
-          lineHeight: 1.5,
-          color: "var(--text-primary)",
-          marginBottom: "8px",
-        }}
-      >
-        {text}
-      </p>
+      <div id={textId}>
+        <p
+          ref={textRef}
+          className={cn(
+            "select-text [overflow-wrap:anywhere]",
+            expanded ? "whitespace-pre-wrap" : "line-clamp-2",
+          )}
+          style={{
+            fontFamily: "'Geist Variable', sans-serif",
+            fontSize: "13px",
+            fontWeight: 450,
+            lineHeight: 1.5,
+            color: "var(--text-primary)",
+            marginBottom: "8px",
+          }}
+        >
+          {text}
+        </p>
+        {expanded && original ? (
+          <div className="mb-3 border-l-2 border-[var(--glass-border-outer)] pl-3">
+            <p
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: "10px",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--text-muted)",
+              }}
+            >
+              {t.original}
+            </p>
+            <p
+              className="mt-1 select-text whitespace-pre-wrap [overflow-wrap:anywhere]"
+              style={{
+                fontFamily: "'Geist Variable', sans-serif",
+                fontSize: "12.5px",
+                fontWeight: 450,
+                lineHeight: 1.5,
+                color: "var(--text-secondary)",
+              }}
+            >
+              {original}
+            </p>
+          </div>
+        ) : null}
+      </div>
 
-      <div className="flex items-center justify-between">
-        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "var(--text-muted)" }}>
+      <div className="flex items-center justify-between gap-3">
+        <span
+          className="tabular-nums"
+          style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "var(--text-muted)" }}
+        >
           {t.words(words)}
         </span>
+        {canExpand ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            aria-controls={textId}
+            className="relative inline-flex items-center gap-1 rounded-md text-[11.5px] font-medium text-[var(--text-secondary)] transition-colors duration-150 ease-out before:absolute before:-inset-x-2 before:-inset-y-3 hover:text-[var(--text-primary)]"
+          >
+            {expanded ? t.showLess : t.showMore}
+            <ChevronDown
+              className={cn("size-3.5", expanded && "rotate-180")}
+              strokeWidth={2.25}
+              aria-hidden
+            />
+          </button>
+        ) : null}
       </div>
     </GlassCard>
   );

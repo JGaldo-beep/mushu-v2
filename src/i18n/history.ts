@@ -18,6 +18,9 @@ const en = {
   agent: "Agent",
   agentNamed: (name: string) => `Agent: ${name}`,
   copy: "Copy",
+  showMore: "Show full transcript",
+  showLess: "Show less",
+  original: "What you said",
   copied: "Copied",
 };
 
@@ -40,6 +43,9 @@ const es: typeof en = {
   agent: "Agente",
   agentNamed: (name: string) => `Agente: ${name}`,
   copy: "Copiar",
+  showMore: "Ver la transcripción completa",
+  showLess: "Ver menos",
+  original: "Lo que dijiste",
   copied: "Copiado",
 };
 
