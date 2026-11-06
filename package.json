@@ -103,5 +103,11 @@
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "wait-on": "^9.0.1"
+  },
+  "allowScripts": {
+    "electron-winstaller@5.4.0": true,
+    "esbuild@0.27.7": true,
+    "sharp@0.34.5": true,
+    "uiohook-napi@1.5.5": true
   }
 }
