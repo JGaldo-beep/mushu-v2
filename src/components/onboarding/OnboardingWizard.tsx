@@ -680,7 +680,7 @@ function SignInStep({
     setError(null);
     try {
       const base = (apiBaseUrl || "https://mushu.space").replace(/\/$/, "");
-      await tauri.openExternalUrl(`${base}/login`);
+      await tauri.openExternalUrl(`${base}/login?from=app`);
       setWaiting(true);
     } catch (e) {
       setError(humanizeAuthError(e, t));

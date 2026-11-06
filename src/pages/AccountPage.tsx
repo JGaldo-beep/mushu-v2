@@ -107,7 +107,7 @@ export function AccountPage() {
 
   const openWebLogin = async () => {
     try {
-      await tauri.openExternalUrl(`${webBaseUrl}/login`);
+      await tauri.openExternalUrl(`${webBaseUrl}/login?from=app`);
       setWaitingForLogin(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
@@ -116,7 +116,7 @@ export function AccountPage() {
 
   const openWebSignup = async () => {
     try {
-      await tauri.openExternalUrl(`${webBaseUrl}/signup`);
+      await tauri.openExternalUrl(`${webBaseUrl}/signup?from=app`);
       setWaitingForLogin(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
