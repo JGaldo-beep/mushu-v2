@@ -1,15 +1,22 @@
+import { useSettingLabel } from "@/components/settingLabel";
+
 interface GlassToggleProps {
   value: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  // Only needed outside a settings row; inside one, the row's label names the switch.
+  ariaLabel?: string;
 }
 
-export function GlassToggle({ value, onChange, disabled }: GlassToggleProps) {
+export function GlassToggle({ value, onChange, disabled, ariaLabel }: GlassToggleProps) {
+  const row = useSettingLabel();
   return (
     <button
       type="button"
       role="switch"
       aria-checked={value}
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabel ? undefined : row?.id}
       disabled={disabled}
       onClick={() => onChange(!value)}
       style={{

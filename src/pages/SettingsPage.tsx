@@ -16,11 +16,12 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/GlassCard";
 import { GlassSelect } from "@/components/GlassSelect";
 import { GlassToggle } from "@/components/GlassToggle";
+import { SettingLabelContext, useSettingLabel } from "@/components/settingLabel";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -92,6 +93,7 @@ function SettingRow({
   control: ReactNode;
   isLast?: boolean;
 }) {
+  const labelId = useId();
   return (
     <div
       className="flex items-center justify-between gap-4 px-4 py-3"
@@ -99,6 +101,7 @@ function SettingRow({
     >
       <div className="min-w-0 flex-1">
         <Label
+          id={labelId}
           htmlFor={htmlFor}
           style={{
             fontFamily: "'Geist Variable', sans-serif",
@@ -123,7 +126,9 @@ function SettingRow({
           </div>
         )}
       </div>
-      <div className="shrink-0">{control}</div>
+      <div className="shrink-0">
+        <SettingLabelContext.Provider value={{ id: labelId, label }}>{control}</SettingLabelContext.Provider>
+      </div>
     </div>
   );
 }
@@ -193,6 +198,7 @@ function HotkeyCapture({
   onChange: (v: string) => void;
 }) {
   const t = useCopy(settingsCopy);
+  const row = useSettingLabel();
   const [capturing, setCapturing] = useState(false);
   const [preview, setPreview] = useState("");
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -267,6 +273,7 @@ function HotkeyCapture({
         ref={btnRef}
         type="button"
         onClick={start}
+        aria-label={row ? `${t.change}: ${row.label}` : undefined}
         className="glass-btn rounded-lg px-2.5 py-1"
         style={{
           fontFamily: "'Geist Variable', sans-serif",

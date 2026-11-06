@@ -7,6 +7,9 @@ const en = {
   active: "Active",
   edit: "Edit",
   delete: "Delete",
+  deleteTitle: (name: string) => `Delete “${name}”?`,
+  deleteBody: "Its instruction is gone for good. If it’s the active agent, Mushu goes back to plain dictation.",
+  deleteFailed: "Couldn’t delete the agent. Try again.",
   footnote:
     "Activating an agent replaces normal formatting: every dictation is rewritten with that agent's instruction until you deactivate it (click the active card again) or pick another one.",
   dialogEditTitle: "Edit voice agent",
@@ -34,6 +37,9 @@ const es: typeof en = {
   active: "Activo",
   edit: "Editar",
   delete: "Eliminar",
+  deleteTitle: (name: string) => `¿Eliminar «${name}»?`,
+  deleteBody: "Su instrucción se pierde para siempre. Si es el agente activo, Mushu vuelve al dictado normal.",
+  deleteFailed: "No pudimos eliminar el agente. Inténtalo de nuevo.",
   footnote:
     "Al activar un agente, cada dictado se reescribe con su instrucción en vez del formato normal, hasta que lo desactives (vuelve a tocar la tarjeta activa) o elijas otro.",
   dialogEditTitle: "Editar agente de voz",

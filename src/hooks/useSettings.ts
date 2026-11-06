@@ -1,7 +1,24 @@
 import { listen } from "@/lib/events";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { tauri } from "@/lib/tauri";
 import type { FrontendState, SaveSettingsInput } from "@/lib/types";
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+// A fresh state from main.js, without losing what the user is in the middle of editing:
+// fields whose draft differs from the last known state keep the draft; the rest update.
+function mergeDraft(
+  prev: FrontendState | null,
+  draft: FrontendState | null,
+  next: FrontendState,
+): FrontendState {
+  if (!prev || !draft) return next;
+  const merged: Record<string, unknown> = { ...next };
+  for (const key of Object.keys(draft) as (keyof FrontendState)[]) {
+    if (!same(draft[key], prev[key])) merged[key] = draft[key];
+  }
+  return merged as FrontendState;
+}
 
 export function useSettings() {
   const [state, setState] = useState<FrontendState | null>(null);
@@ -9,18 +26,24 @@ export function useSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const stateRef = useRef<FrontendState | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // main.js broadcasts frontend_state_changed from ~20 places (language, agents, account,
+  // mic hot-plug…). Those background reloads used to replace the draft, silently throwing
+  // away unsaved edits, and dimmed the page each time. Only the first load shows `loading`.
+  const load = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
     try {
       const fs = await tauri.getFrontendState();
+      const prev = stateRef.current;
+      stateRef.current = fs;
       setState(fs);
-      setDraft(fs);
+      setDraft((d) => mergeDraft(prev, d, fs));
       setError(null);
     } catch (e) {
       setError(String(e));
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, []);
 
@@ -30,7 +53,7 @@ export function useSettings() {
 
   useEffect(() => {
     const unlistenPromise = listen("frontend_state_changed", () => {
-      void load();
+      void load(true);
     });
     return () => {
       void unlistenPromise.then((u) => u());
@@ -44,8 +67,7 @@ export function useSettings() {
     [],
   );
 
-  const isDirty =
-    !!state && !!draft && JSON.stringify(state) !== JSON.stringify(draft);
+  const isDirty = !!state && !!draft && !same(state, draft);
 
   const save = useCallback(async () => {
     if (!draft) return;
@@ -75,6 +97,7 @@ export function useSettings() {
         deepgram_replacements: draft.deepgram_replacements ?? [],
       };
       const updated = await tauri.saveSettings(input);
+      stateRef.current = updated;
       setState(updated);
       setDraft(updated);
       return updated;
@@ -90,6 +113,8 @@ export function useSettings() {
     if (state) setDraft(state);
   }, [state]);
 
+  const refresh = useCallback(() => load(true), [load]);
+
   return {
     state,
     draft,
@@ -100,6 +125,6 @@ export function useSettings() {
     setField,
     save,
     reset,
-    refresh: load,
+    refresh,
   };
 }

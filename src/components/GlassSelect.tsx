@@ -1,3 +1,4 @@
+import { useSettingLabel } from "@/components/settingLabel";
 import {
   Select,
   SelectContent,
@@ -28,9 +29,11 @@ export function GlassSelect({
   disabled,
   className,
 }: GlassSelectProps) {
+  const row = useSettingLabel();
   return (
     <Select value={value} onValueChange={onChange} disabled={disabled}>
       <SelectTrigger
+        aria-labelledby={row?.id}
         className={className}
         style={{
           background: "var(--card)",

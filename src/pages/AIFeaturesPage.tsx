@@ -253,7 +253,7 @@ function FeatureCard({ icon: Icon, color, title, description, value, onChange, e
                 {description}
               </p>
             </div>
-            <GlassToggle value={value} onChange={onChange} />
+            <GlassToggle value={value} onChange={onChange} ariaLabel={title} />
           </div>
           {extra}
         </div>

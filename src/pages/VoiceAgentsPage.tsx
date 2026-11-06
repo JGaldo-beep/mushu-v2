@@ -1,5 +1,6 @@
 import { Bot, Check, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { GlassCard } from "@/components/GlassCard";
 import { tauri } from "@/lib/tauri";
 import { Button } from "@/components/ui/button";
@@ -125,6 +126,11 @@ function AgentDialog({
   );
 }
 
+// Edit/Delete on a card: 40px targets above the card's stretched toggle, visible on hover
+// or when anything in the card has keyboard focus.
+const AGENT_ACTION =
+  "relative z-10 grid size-8 place-items-center rounded-lg text-[var(--text-muted)] opacity-0 transition-[opacity,color,background-color] duration-150 ease-out before:absolute before:-inset-1 hover:bg-[var(--glass-surface)] hover:text-[var(--text-primary)] focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100";
+
 export function VoiceAgentsPage() {
   const t = useCopy(voiceAgentsCopy);
   const { agents, activeAgentId, saveAgent, deleteAgent, setActiveAgent } = useVoiceAgents();
@@ -134,6 +140,9 @@ export function VoiceAgentsPage() {
   // state (useState initializers) picks up the current `agent` prop fresh,
   // instead of reusing stale state from a previous open of the dialog.
   const [dialogSession, setDialogSession] = useState(0);
+  // Deleting throws away a hand-written instruction, so it asks first.
+  const [pendingDelete, setPendingDelete] = useState<VoiceAgent | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const openCreate = () => {
     setEditingAgent(null);
@@ -141,16 +150,23 @@ export function VoiceAgentsPage() {
     setDialogOpen(true);
   };
 
-  const openEdit = (agent: VoiceAgent, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openEdit = (agent: VoiceAgent) => {
     setEditingAgent(agent);
     setDialogSession((n) => n + 1);
     setDialogOpen(true);
   };
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    deleteAgent(id).catch(() => {});
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await deleteAgent(pendingDelete.id);
+      setPendingDelete(null);
+    } catch {
+      toast.error(t.deleteFailed);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const toggleActive = (agent: VoiceAgent) => {
@@ -216,24 +232,21 @@ export function VoiceAgentsPage() {
             {agents.map((agent) => {
               const isActive = activeAgentId === agent.id;
               return (
-                <button
-                  key={agent.id}
-                  type="button"
-                  onClick={() => toggleActive(agent)}
-                  className="group text-left"
-                  style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
-                >
+                // The card is a container: its toggle button stretches over the whole card
+                // (click anywhere still activates), and Edit/Delete are real buttons above it.
+                <div key={agent.id} className="group relative text-left">
                   <GlassCard
                     variant={isActive ? "strong" : "default"}
-                    className="relative flex flex-col gap-3 p-5 transition-all"
+                    className="relative flex h-full flex-col gap-3 p-5 transition-[background-color,border-color,box-shadow] duration-150 ease-out"
                     style={{
                       minHeight: "180px",
                       border: isActive
                         ? `0.5px solid ${agentTint(33)}`
                         : "0.5px solid var(--glass-border-outer)",
+                      // Theme tokens: the old 28-30% black shadows looked dirty in the light theme.
                       boxShadow: isActive
-                        ? `inset 0 1px 0 var(--glass-border), 0 0 0 1px ${agentTint(25)}, 0 8px 24px rgba(0,0,0,0.30)`
-                        : "inset 0 1px 0 var(--glass-border), 0 1px 2px rgba(0,0,0,0.20), 0 8px 24px rgba(0,0,0,0.28)",
+                        ? `var(--glass-highlight), 0 0 0 1px ${agentTint(25)}, var(--elev-shadow)`
+                        : "var(--glass-highlight), var(--elev-shadow)",
                     }}
                   >
                     <div className="flex items-start justify-between">
@@ -270,47 +283,33 @@ export function VoiceAgentsPage() {
                             {t.active}
                           </span>
                         )}
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => openEdit(agent, e)}
-                          aria-label={t.edit}
+                        {/* Shown on hover, and whenever anything in the card has keyboard focus. */}
+                        <button
+                          type="button"
+                          onClick={() => openEdit(agent)}
+                          aria-label={`${t.edit}: ${agent.name}`}
                           title={t.edit}
-                          className="opacity-0 transition-opacity group-hover:opacity-100"
-                          style={{
-                            width: "24px",
-                            height: "24px",
-                            borderRadius: "8px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "var(--text-muted)",
-                          }}
+                          className={AGENT_ACTION}
                         >
                           <Pencil size={13} strokeWidth={2} />
-                        </span>
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => handleDelete(agent.id, e)}
-                          aria-label={t.delete}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(agent)}
+                          aria-label={`${t.delete}: ${agent.name}`}
                           title={t.delete}
-                          className="opacity-0 transition-opacity group-hover:opacity-100"
-                          style={{
-                            width: "24px",
-                            height: "24px",
-                            borderRadius: "8px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "var(--text-muted)",
-                          }}
+                          className={AGENT_ACTION}
                         >
                           <Trash2 size={13} strokeWidth={2} />
-                        </span>
+                        </button>
                       </div>
                     </div>
-                    <div className="flex-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleActive(agent)}
+                      aria-pressed={isActive}
+                      className="flex-1 rounded-md text-left before:absolute before:inset-0 before:rounded-[inherit] focus-visible:outline-none focus-visible:before:outline focus-visible:before:outline-2 focus-visible:before:outline-ring"
+                    >
                       <h3
                         style={{
                           fontFamily: "'Geist Variable', sans-serif",
@@ -338,9 +337,9 @@ export function VoiceAgentsPage() {
                       >
                         {agent.instruction}
                       </p>
-                    </div>
+                    </button>
                   </GlassCard>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -359,6 +358,23 @@ export function VoiceAgentsPage() {
           {t.footnote}
         </p>
       </div>
+
+      <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && !deleting && setPendingDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{pendingDelete ? t.deleteTitle(pendingDelete.name) : ""}</DialogTitle>
+            <DialogDescription>{t.deleteBody}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={deleting} onClick={() => setPendingDelete(null)}>
+              {t.cancel}
+            </Button>
+            <Button variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
+              {t.delete}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AgentDialog
         key={dialogSession}

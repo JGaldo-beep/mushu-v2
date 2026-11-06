@@ -147,6 +147,7 @@ export function HistoryPage({ embedded = false }: HistoryPageProps = {}) {
             />
             <input
               type="search"
+              aria-label={t.search}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t.search}
@@ -278,7 +279,8 @@ function HistoryRow({ item }: { item: HistoryItem }) {
   const Icon = historyIcon(item.mode_used);
   const color = HISTORY_BADGE_COLOR;
   const label = historyLabel(item.mode_used, t);
-  const words = item.processed_text.split(/\s+/).filter(Boolean).length;
+  const text = item.processed_text || item.raw_text;
+  const words = text.split(/\s+/).filter(Boolean).length;
 
   return (
     <GlassCard className="group p-4 transition-all" style={{ cursor: "default" }}>
@@ -307,7 +309,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
           </span>
         </div>
         <CopyButton
-          text={item.processed_text}
+          text={text}
           variant="ghost"
           size="sm"
           className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
@@ -325,7 +327,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
           marginBottom: "8px",
         }}
       >
-        {item.processed_text}
+        {text}
       </p>
 
       <div className="flex items-center justify-between">
