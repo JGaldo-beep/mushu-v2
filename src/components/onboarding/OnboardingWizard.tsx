@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { useAudioDevices } from "@/hooks/useAudioDevices";
 import { useCopy } from "@/i18n";
 import { onboardingCopy } from "@/i18n/onboarding";
-import { listen } from "@/lib/events";
 import { patchSettings, tauri } from "@/lib/tauri";
 import type { MushuAccount } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -26,7 +25,10 @@ type ConfettiStyle = CSSProperties & {
 type T = (typeof onboardingCopy)["en"];
 
 const ease = [0.33, 1, 0.68, 1] as const;
-const stepTransition = { duration: 0.36, ease } as const;
+const stepTransition = { duration: 0.2, ease } as const;
+const SIGNIN_INDEX = STEPS.indexOf("signin");
+// How long to wait for the deep link before suggesting the browser may have blocked it.
+const LONG_WAIT_MS = 45_000;
 
 type Props = {
   hotkey: string;
@@ -34,7 +36,8 @@ type Props = {
   account: MushuAccount | null;
   apiBaseUrl: string;
   onComplete: () => Promise<void>;
-  onAuthChanged: () => void;
+  // Tell the onboarding hook to keep the wizard open once sign-in is underway.
+  onHoldOpen: (hold: boolean) => void;
 };
 
 export function OnboardingWizard({
@@ -43,12 +46,13 @@ export function OnboardingWizard({
   account,
   apiBaseUrl,
   onComplete,
-  onAuthChanged,
+  onHoldOpen,
 }: Props) {
   const t = useCopy(onboardingCopy);
   const [stepIndex, setStepIndex] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);
   const [busy, setBusy] = useState(false);
+  const [finishError, setFinishError] = useState(false);
   const [confettiSeed, setConfettiSeed] = useState(0);
   const signedInEmail = account?.user.email || null;
   const prevSignedInEmailRef = useRef<string | null>(signedInEmail);
@@ -61,6 +65,11 @@ export function OnboardingWizard({
   }, [signedInEmail]);
 
   const step = STEPS[stepIndex];
+  const isTrial = account?.entitlement?.status === "trial";
+
+  useEffect(() => {
+    onHoldOpen(stepIndex >= SIGNIN_INDEX);
+  }, [stepIndex, onHoldOpen]);
   const dictationParts = hotkey.split("+");
   const pttParts = pttHotkey.split("+");
 
@@ -75,8 +84,11 @@ export function OnboardingWizard({
 
   const finish = async () => {
     setBusy(true);
+    setFinishError(false);
     try {
       await onComplete();
+    } catch {
+      setFinishError(true);
     } finally {
       setBusy(false);
     }
@@ -92,7 +104,7 @@ export function OnboardingWizard({
       <motion.div
         initial={{ opacity: 0, y: 16, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.42, ease }}
+        transition={{ duration: 0.28, ease }}
         className="relative w-full max-w-[640px]"
       >
         <div
@@ -121,7 +133,7 @@ export function OnboardingWizard({
               type="button"
               disabled={busy}
               onClick={() => void finish()}
-              className="text-[11px] uppercase text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+              className="relative text-[11px] uppercase text-muted-foreground transition-colors before:absolute before:-inset-x-2 before:-inset-y-3 hover:text-foreground disabled:opacity-50"
               style={{ letterSpacing: "0.14em" }}
             >
               {t.skip}
@@ -141,29 +153,25 @@ export function OnboardingWizard({
                 className="flex flex-col gap-6"
               >
                 {step === "welcome" && <WelcomeStep />}
-                {step === "mic" && <MicStep active={step === "mic"} />}
+                {step === "mic" && <MicStep active />}
                 {step === "shortcuts" && (
                   <ShortcutsStep dictationParts={dictationParts} pttParts={pttParts} />
                 )}
                 {step === "signin" && (
-                  <SignInStep
-                    signedInEmail={signedInEmail}
-                    apiBaseUrl={apiBaseUrl}
-                    onAuthChanged={onAuthChanged}
-                    onAdvance={goNext}
-                  />
+                  <SignInStep signedInEmail={signedInEmail} isTrial={isTrial} apiBaseUrl={apiBaseUrl} />
                 )}
                 {step === "done" && (
-                  <DoneStep
-                    signedInEmail={signedInEmail}
-                    dictationParts={dictationParts}
-                    onFinish={() => void finish()}
-                    busy={busy}
-                  />
+                  <DoneStep signedInEmail={signedInEmail} dictationParts={dictationParts} />
                 )}
               </motion.div>
             </AnimatePresence>
           </div>
+
+          {finishError ? (
+            <p role="alert" className="px-8 pb-3 text-[12px] text-destructive">
+              {t.finishFailed}
+            </p>
+          ) : null}
 
           {/* Footer */}
           <div
@@ -173,10 +181,9 @@ export function OnboardingWizard({
             <Button
               type="button"
               variant="ghost"
-              size="sm"
               disabled={stepIndex === 0 || busy}
               onClick={goBack}
-              className="gap-1.5 text-muted-foreground"
+              className="h-10 gap-1.5 text-muted-foreground"
             >
               <ArrowLeft size={14} strokeWidth={2} />
               {t.back}
@@ -187,7 +194,7 @@ export function OnboardingWizard({
                 <span
                   key={i}
                   className={cn(
-                    "h-[3px] rounded-full transition-all",
+                    "h-[3px] rounded-full transition-[width,background-color] duration-200 ease-out",
                     i === stepIndex
                       ? "w-7 bg-foreground"
                       : i < stepIndex
@@ -198,19 +205,17 @@ export function OnboardingWizard({
               ))}
             </div>
 
-            {stepIndex < STEP_COUNT - 1 ? (
-              <Button
-                type="button"
-                size="sm"
-                disabled={busy}
-                onClick={goNext}
-                className="gap-1.5"
-              >
+            {step === "signin" && !signedInEmail ? (
+              <Button type="button" variant="ghost" disabled={busy} onClick={goNext} className="h-10 text-muted-foreground">
+                {t.skipForNow}
+              </Button>
+            ) : stepIndex < STEP_COUNT - 1 ? (
+              <Button type="button" disabled={busy} onClick={goNext} className="h-10 gap-1.5">
                 {t.next}
                 <ArrowRight size={14} strokeWidth={2} />
               </Button>
             ) : (
-              <Button type="button" size="sm" disabled={busy} onClick={() => void finish()}>
+              <Button type="button" disabled={busy} onClick={() => void finish()} className="h-10">
                 {busy ? t.finishing : t.start}
               </Button>
             )}
@@ -226,6 +231,10 @@ export function OnboardingWizard({
  * ------------------------------------------------------------------ */
 
 function StepHeader({ numeral, title }: { numeral: string; title: string }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    headingRef.current?.focus({ preventScroll: true });
+  }, [title]);
   return (
     <div className="flex items-start gap-5">
       <span
@@ -244,8 +253,10 @@ function StepHeader({ numeral, title }: { numeral: string; title: string }) {
       </span>
       <div className="flex-1 pt-1">
         <h2
+          ref={headingRef}
           id="onboarding-title"
-          className="text-foreground"
+          tabIndex={-1}
+          className="text-balance text-foreground outline-none"
           style={{
             fontSize: "28px",
             lineHeight: 1.1,
@@ -300,20 +311,32 @@ function WelcomeStep() {
 
 function MicStep({ active }: { active: boolean }) {
   const t = useCopy(onboardingCopy);
-  const { devices, refresh, needsPermission } = useAudioDevices();
+  const { devices, defaultLabel, refresh, needsPermission } = useAudioDevices();
   const [deviceId, setDeviceId] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
-  const { level, error, hasSignal } = useMicLevel(active, deviceId || null);
+  // Bumped by Refresh so the level meter retries after a permission fix.
+  const [retryKey, setRetryKey] = useState(0);
+  const { level, error, hasSignal } = useMicLevel(active, deviceId || null, retryKey);
 
   useEffect(() => {
-    // Default to the first device once they load.
-    if (!deviceId && devices.length > 0) setDeviceId(devices[0].deviceId);
-  }, [deviceId, devices]);
+    let cancelled = false;
+    void tauri
+      .getFrontendState()
+      .then((fs) => {
+        if (!cancelled) setDeviceId(fs.selected_microphone ?? "");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleDeviceChange = async (next: string) => {
     setDeviceId(next);
     try {
-      await patchSettings({ selected_microphone: next || null });
+      // The label lets startup re-match the device after an unplug, as Settings does.
+      const label = devices.find((d) => d.deviceId === next)?.label ?? null;
+      await patchSettings({ selected_microphone: next || null, selected_microphone_label: next ? label : null });
     } catch {
       /* ignore — they can adjust in Settings */
     }
@@ -323,6 +346,7 @@ function MicStep({ active }: { active: boolean }) {
     setRefreshing(true);
     try {
       await refresh();
+      setRetryKey((k) => k + 1);
     } finally {
       window.setTimeout(() => setRefreshing(false), 400);
     }
@@ -342,19 +366,18 @@ function MicStep({ active }: { active: boolean }) {
         <div className="flex-1">
           <select
             value={deviceId}
+            aria-label={t.micDeviceLabel}
             onChange={(e) => void handleDeviceChange(e.target.value)}
-            className="h-9 w-full rounded-md bg-card px-3 text-sm text-foreground transition-colors focus:outline-none"
-            style={{ border: "0.5px solid var(--border)" }}
+            className="glass-input h-10 w-full rounded-md px-3 text-sm transition-colors"
           >
-            {devices.length === 0 ? (
-              <option value="">{t.micSystemDefault}</option>
-            ) : (
-              devices.map((d) => (
-                <option key={d.deviceId} value={d.deviceId}>
-                  {d.label}
-                </option>
-              ))
-            )}
+            <option value="">
+              {defaultLabel ? `${t.micSystemDefault}: ${defaultLabel}` : t.micSystemDefault}
+            </option>
+            {devices.map((d) => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label}
+              </option>
+            ))}
           </select>
         </div>
         <button
@@ -362,7 +385,7 @@ function MicStep({ active }: { active: boolean }) {
           onClick={() => void handleRefresh()}
           disabled={refreshing}
           aria-label={t.micRefresh}
-          className="flex h-9 w-9 items-center justify-center rounded-md bg-card text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+          className="flex size-10 items-center justify-center rounded-md bg-card text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
           style={{ border: "0.5px solid var(--border)" }}
         >
           <RefreshCw
@@ -383,8 +406,9 @@ function MicStep({ active }: { active: boolean }) {
       >
         <MicBars level={level} active={active && !error} />
         <div className="mt-4 flex items-center justify-between gap-3 text-[12px]">
+          <span role="status" aria-live="polite">
           {error ? (
-            <span className="text-destructive">{humanizeMicError(error, t)}</span>
+            <span role="alert" className="text-destructive">{humanizeMicError(error, t)}</span>
           ) : needsPermission ? (
             <span className="text-muted-foreground">
               {t.micAllow}
@@ -397,7 +421,9 @@ function MicStep({ active }: { active: boolean }) {
           ) : (
             <span className="text-muted-foreground">{t.micSpeak}</span>
           )}
+          </span>
           <span
+            aria-hidden
             className="text-muted-foreground"
             style={{
               fontFamily: "var(--font-mono)",
@@ -432,14 +458,16 @@ function MicBars({ level, active }: { level: number; active: boolean }) {
 
   useEffect(() => {
     let raf = 0;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const tick = (now: number) => {
       const lv = activeRef.current ? Math.max(0, Math.min(1, levelRef.current)) : 0;
       for (let i = 0; i < BAR_COUNT; i++) {
         const center = 1 - Math.abs(i - (BAR_COUNT - 1) / 2) / ((BAR_COUNT - 1) / 2);
         const noise = 0.55 + Math.sin(i * 1.43) * 0.22;
-        const pulse =
-          0.6 + Math.sin(now / 92 + i * 0.7) * 0.22 + Math.sin(now / 153 + i * 1.21) * 0.13;
-        const idleBreath = (Math.sin(now / 720 + i * 0.38) + 1) * 0.5 * 0.04;
+        const pulse = still
+          ? 0.8
+          : 0.6 + Math.sin(now / 92 + i * 0.7) * 0.22 + Math.sin(now / 153 + i * 1.21) * 0.13;
+        const idleBreath = still ? 0 : (Math.sin(now / 720 + i * 0.38) + 1) * 0.5 * 0.04;
         const voice = lv * (noise + center * 0.5) * pulse;
         const target = MIN_H + Math.max(idleBreath, voice) * (MAX_H - MIN_H);
         renderedRef.current[i] += (target - renderedRef.current[i]) * 0.32;
@@ -479,7 +507,7 @@ function MicBars({ level, active }: { level: number; active: boolean }) {
   );
 }
 
-function useMicLevel(active: boolean, deviceId: string | null) {
+function useMicLevel(active: boolean, deviceId: string | null, retryKey: number) {
   const [level, setLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [hasSignal, setHasSignal] = useState(false);
@@ -561,7 +589,7 @@ function useMicLevel(active: boolean, deviceId: string | null) {
       stream?.getTracks().forEach((t) => t.stop());
       void ctx?.close().catch(() => {});
     };
-  }, [active, deviceId]);
+  }, [active, deviceId, retryKey]);
 
   return { level, error, hasSignal };
 }
@@ -640,36 +668,48 @@ function ShortcutCard({
 
 function SignInStep({
   signedInEmail,
+  isTrial,
   apiBaseUrl,
-  onAuthChanged,
-  onAdvance,
 }: {
   signedInEmail: string | null;
+  isTrial: boolean;
   apiBaseUrl: string;
-  onAuthChanged: () => void;
-  onAdvance: () => void;
 }) {
   const t = useCopy(onboardingCopy);
   const [waiting, setWaiting] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [longWait, setLongWait] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const continueRef = useRef<HTMLButtonElement>(null);
+  const reopenRef = useRef<HTMLButtonElement>(null);
+  const mountedRef = useRef(false);
 
-  // While waiting for the deep link, poll the main process for the latest session state.
-  // The deep link arrives async and broadcasts `frontend_state_changed`; we listen for that.
+  // The button that was focused unmounts when waiting starts or stops; move focus to its
+  // counterpart instead of dropping it on <body>.
   useEffect(() => {
-    if (!waiting) return;
-    let off: (() => void) | null = null;
-    let cancelled = false;
-    void listen("frontend_state_changed", () => {
-      if (!cancelled) onAuthChanged();
-    }).then((u) => {
-      if (cancelled) u();
-      else off = u;
-    });
-    return () => {
-      cancelled = true;
-      if (off) off();
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    (waiting ? reopenRef : continueRef).current?.focus();
+  }, [waiting]);
+
+  // Escape cancels the wait; past LONG_WAIT_MS, say what usually went wrong.
+  useEffect(() => {
+    if (!waiting) {
+      setLongWait(false);
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setWaiting(false);
     };
-  }, [waiting, onAuthChanged]);
+    window.addEventListener("keydown", onKey);
+    const timer = window.setTimeout(() => setLongWait(true), LONG_WAIT_MS);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.clearTimeout(timer);
+    };
+  }, [waiting]);
 
   // When the session lands, stop waiting.
   useEffect(() => {
@@ -677,13 +717,17 @@ function SignInStep({
   }, [signedInEmail, waiting]);
 
   const openBrowser = async () => {
+    if (opening) return;
     setError(null);
+    setOpening(true);
     try {
       const base = (apiBaseUrl || "https://mushu.space").replace(/\/$/, "");
       await tauri.openExternalUrl(`${base}/login?from=app`);
       setWaiting(true);
     } catch (e) {
       setError(humanizeAuthError(e, t));
+    } finally {
+      setOpening(false);
     }
   };
 
@@ -701,6 +745,7 @@ function SignInStep({
           <span className="text-foreground">mushu.space</span>
           {t.signedInAfter}
         </p>
+        {isTrial ? (
         <div
           className="inline-flex items-center gap-2 self-start rounded-full px-3 py-1.5"
           style={{
@@ -716,15 +761,7 @@ function SignInStep({
             {t.trialActive}
           </span>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          onClick={onAdvance}
-          className="mt-1 self-start gap-1.5"
-        >
-          {t.continue}
-          <ArrowRight size={14} strokeWidth={2} />
-        </Button>
+        ) : null}
       </>
     );
   }
@@ -759,18 +796,19 @@ function SignInStep({
                 >
                   {t.waiting}
                 </span>
-                <span className="text-[11.5px] text-muted-foreground">
-                  {t.waitingHint}
+                <span className="text-[11.5px] text-muted-foreground" aria-live="polite">
+                  {longWait ? t.waitingLong : t.waitingHint}
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Button
+                ref={reopenRef}
                 type="button"
                 variant="outline"
-                size="sm"
+                disabled={opening}
                 onClick={() => void openBrowser()}
-                className="gap-1.5"
+                className="h-10 gap-1.5"
               >
                 <ExternalLink size={13} strokeWidth={2.2} />
                 {t.reopenBrowser}
@@ -778,7 +816,7 @@ function SignInStep({
               <button
                 type="button"
                 onClick={() => setWaiting(false)}
-                className="text-[11.5px] text-muted-foreground transition-colors hover:text-foreground"
+                className="relative text-[11.5px] text-muted-foreground transition-colors before:absolute before:-inset-x-2 before:-inset-y-3 hover:text-foreground"
               >
                 {t.cancel}
               </button>
@@ -787,13 +825,18 @@ function SignInStep({
         ) : (
           <>
             <Button
+              ref={continueRef}
               type="button"
-              size="sm"
+              disabled={opening}
               onClick={() => void openBrowser()}
-              className="gap-2 self-start"
+              className="h-10 gap-2 self-start"
             >
-              <ExternalLink size={14} strokeWidth={2.2} />
-              {t.continueInBrowser}
+              {opening ? (
+                <Loader2 size={14} strokeWidth={2.2} className="animate-spin motion-reduce:animate-none" />
+              ) : (
+                <ExternalLink size={14} strokeWidth={2.2} />
+              )}
+              {opening ? t.opening : t.continueInBrowser}
             </Button>
             <p className="text-[11.5px] text-muted-foreground" style={{ lineHeight: 1.5 }}>
               {t.newHereBefore}
@@ -828,13 +871,9 @@ function SignInStep({
 function DoneStep({
   signedInEmail,
   dictationParts,
-  onFinish,
-  busy,
 }: {
   signedInEmail: string | null;
   dictationParts: string[];
-  onFinish: () => void;
-  busy: boolean;
 }) {
   const t = useCopy(onboardingCopy);
   return (
@@ -871,16 +910,6 @@ function DoneStep({
           </>
         )}
       </p>
-
-      <Button
-        type="button"
-        size="sm"
-        disabled={busy}
-        onClick={onFinish}
-        className="mt-1 self-start"
-      >
-        {busy ? t.finishing : t.start}
-      </Button>
     </>
   );
 }
@@ -901,7 +930,7 @@ function ConfettiBurst() {
   });
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-hidden>
+    <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden motion-reduce:hidden" aria-hidden>
       {particles.map((p, i) => {
         const confettiStyle: ConfettiStyle = {
           backgroundColor: p.color,
@@ -948,9 +977,8 @@ function ConfettiBurst() {
 
 function humanizeAuthError(err: unknown, t: T): string {
   const raw = err instanceof Error ? err.message : String(err);
-  if (/invalid.*credentials|invalid_grant/i.test(raw)) return t.authMismatch;
   if (/network|fetch|timeout/i.test(raw)) return t.authNetwork;
-  return raw;
+  return t.authOpenFailed;
 }
 
 function humanizeMicError(raw: string, t: T): string {

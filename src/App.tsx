@@ -19,9 +19,13 @@ function App() {
   const [section, setSection] = useState<NavSection>("home");
   useTheme();
   const onboarding = useOnboarding();
+  const wizardOpen = !onboarding.loading && onboarding.open && Boolean(onboarding.snapshot);
 
   return (
     <TooltipProvider delayDuration={200}>
+      {/* While the wizard is up, the app behind it is out of the tab order and hidden from
+          screen readers, so focus can't wander behind the dialog. */}
+      <div className="contents" inert={wizardOpen}>
       <HistoryProvider>
         <AppShell section={section} onSectionChange={setSection}>
           <AnimatePresence mode="sync">
@@ -35,15 +39,16 @@ function App() {
           </AnimatePresence>
         </AppShell>
       </HistoryProvider>
+      </div>
       <Toaster richColors position="bottom-right" />
-      {!onboarding.loading && onboarding.open && onboarding.snapshot && (
+      {wizardOpen && onboarding.snapshot && (
         <OnboardingWizard
           hotkey={onboarding.snapshot.hotkey}
           pttHotkey={onboarding.snapshot.ptt_hotkey}
           account={onboarding.snapshot.account}
           apiBaseUrl={onboarding.snapshot.api_base_url}
           onComplete={onboarding.complete}
-          onAuthChanged={onboarding.refresh}
+          onHoldOpen={onboarding.holdOpen}
         />
       )}
     </TooltipProvider>
